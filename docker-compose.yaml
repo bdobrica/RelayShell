@@ -1,0 +1,27 @@
+services:
+  tuwunel:
+    build:
+      context: .
+      dockerfile: Dockerfile.tuwunel
+    container_name: relayshell-tuwunel
+    environment:
+      CONDUWUIT_SERVER_NAME: localhost
+      CONDUWUIT_DATABASE_PATH: /var/lib/tuwunel
+      CONDUWUIT_PORT: 8008
+      CONDUWUIT_ALLOW_REGISTRATION: "true"
+      CONDUWUIT_REGISTRATION_TOKEN: integration-test-token
+      CONDUWUIT_ALLOW_FEDERATION: "false"
+      CONDUWUIT_ALLOW_PUBLIC_ROOM_DIRECTORY: "false"
+      CONDUWUIT_LOG: info
+    ports:
+      - "8008:8008"
+    volumes:
+      - tuwunel-data:/var/lib/tuwunel
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8008/_matrix/client/versions"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  tuwunel-data:
