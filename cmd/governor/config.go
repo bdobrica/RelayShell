@@ -35,7 +35,7 @@ func loadConfig() (config, error) {
 	containerRuntime := envWithDefault("RELAY_CONTAINER_RUNTIME", "docker")
 	containerImage := envWithDefault("RELAY_CONTAINER_IMAGE", "alpine:3.20")
 	codexImage := envWithDefault("RELAY_AGENT_CODEX_IMAGE", "relayshell-codex:latest")
-	codexCommand := envWithDefault("RELAY_AGENT_CODEX_COMMAND", "codex")
+	codexCommand := normalizeCodexCommand(envWithDefault("RELAY_AGENT_CODEX_COMMAND", "codex"))
 	copilotImage := envWithDefault("RELAY_AGENT_COPILOT_IMAGE", containerImage)
 	copilotCommand := envWithDefault("RELAY_AGENT_COPILOT_COMMAND", "cat")
 
@@ -102,4 +102,12 @@ func collectProcessEnv(names []string) map[string]string {
 		}
 	}
 	return env
+}
+
+func normalizeCodexCommand(value string) string {
+	trimmed := strings.TrimSpace(value)
+	if trimmed == "" || trimmed == "codex" {
+		return "script -q -e -c codex /dev/null"
+	}
+	return trimmed
 }
