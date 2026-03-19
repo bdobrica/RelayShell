@@ -169,4 +169,5 @@ Then use that HTTPS URL in Element Web advanced login.
 - If governor fails with missing env vars: verify `.env` exists and required fields are set.
 - If codex fails to authenticate: verify `OPENAI_API_KEY` in `.env` and ensure it is listed in `RELAY_CONTAINER_PASSTHROUGH_ENV`.
 - If Matrix login/join fails: inspect homeserver logs with `make tuwunel-logs`.
-- If session room shows `Error: stdin is not a terminal`: rebuild Codex image (`make build-codex-image`), restart governor, and ensure `RELAY_AGENT_CODEX_COMMAND` is `script -q -e -c codex /dev/null` (or leave it as legacy `codex`, which is auto-normalized by governor).
+- Interactive bridge default: `RELAY_AGENT_CODEX_COMMAND` should be `script -q -e -c "codex --no-alt-screen" /dev/null` (legacy `codex` is auto-normalized to this value by governor).
+- If interactive behavior is still problematic in your environment, fallback to non-interactive mode: `while IFS= read -r line; do [ -z "$line" ] && continue; codex exec --skip-git-repo-check "$line"; done`.

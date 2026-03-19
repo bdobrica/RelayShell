@@ -1,10 +1,11 @@
 package bridge
 
 import (
-	"bufio"
 	"context"
 	"io"
 	"log/slog"
+	"regexp"
+	"strings"
 
 	"github.com/bdobrica/RelayShell/internal/container"
 )
@@ -12,6 +13,12 @@ import (
 type MatrixSender interface {
 	SendText(ctx context.Context, roomID, body string) error
 }
+
+var (
+	ansiOSCRegexp    = regexp.MustCompile(`\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)`)
+	ansiCSIRegexp    = regexp.MustCompile(`\x1b\[[0-?]*[ -/]*[@-~]`)
+	ansiSingleRegexp = regexp.MustCompile(`\x1b[@-_]`)
+)
 
 type Bridge struct {
 	logger *slog.Logger
@@ -50,21 +57,72 @@ func (b *Bridge) Stop() error {
 }
 
 func (b *Bridge) pumpOutput(ctx context.Context, reader io.Reader, prefix string) {
-	scanner := bufio.NewScanner(reader)
-	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
+	buffer := make([]byte, 4096)
+	pending := ""
 
-	for scanner.Scan() {
-		line := scanner.Text()
-		if line == "" {
-			continue
+	flushPending := func(force bool) error {
+		if pending == "" {
+			return nil
 		}
-		if err := b.sender.SendText(ctx, b.roomID, prefix+line); err != nil {
-			b.logger.Error("bridge send output failed", "error", err)
+
+		for {
+			newlineIndex := strings.IndexByte(pending, '\n')
+			if newlineIndex < 0 {
+				if force {
+					chunk := sanitizeTerminalOutput(pending)
+					pending = ""
+					if chunk != "" {
+						if err := b.sender.SendText(ctx, b.roomID, prefix+chunk); err != nil {
+							return err
+						}
+					}
+				}
+				return nil
+			}
+
+			line := sanitizeTerminalOutput(pending[:newlineIndex])
+			pending = pending[newlineIndex+1:]
+			if line == "" {
+				continue
+			}
+			if err := b.sender.SendText(ctx, b.roomID, prefix+line); err != nil {
+				return err
+			}
+		}
+	}
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		default:
+		}
+
+		n, err := reader.Read(buffer)
+		if n > 0 {
+			pending += string(buffer[:n])
+			if err := flushPending(true); err != nil {
+				b.logger.Error("bridge send output failed", "error", err)
+				return
+			}
+		}
+
+		if err != nil {
+			if err != io.EOF {
+				b.logger.Error("bridge reader failed", "error", err)
+			}
+			if err := flushPending(true); err != nil {
+				b.logger.Error("bridge flush output failed", "error", err)
+			}
 			return
 		}
 	}
+}
 
-	if err := scanner.Err(); err != nil {
-		b.logger.Error("bridge scanner failed", "error", err)
-	}
+func sanitizeTerminalOutput(input string) string {
+	output := strings.ReplaceAll(input, "\r", "")
+	output = ansiOSCRegexp.ReplaceAllString(output, "")
+	output = ansiCSIRegexp.ReplaceAllString(output, "")
+	output = ansiSingleRegexp.ReplaceAllString(output, "")
+	return strings.TrimSpace(output)
 }

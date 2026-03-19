@@ -107,7 +107,7 @@ func collectProcessEnv(names []string) map[string]string {
 func normalizeCodexCommand(value string) string {
 	trimmed := strings.TrimSpace(value)
 	if trimmed == "" || trimmed == "codex" {
-		return "script -q -e -c codex /dev/null"
+		return "script -q -e -c \"codex --no-alt-screen\" /dev/null"
 	}
 	return trimmed
 }

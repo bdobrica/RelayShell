@@ -112,12 +112,28 @@ func (a *app) handleEvent(ctx context.Context, event matrixbot.Event) {
 func (a *app) handleGovernorEvent(ctx context.Context, event matrixbot.Event) {
 	cmd, err := sessions.ParseCommand(event.Body)
 	if err != nil {
-		_ = a.matrix.SendText(ctx, event.RoomID, "Governor room accepts only valid commands. Example: /start repo=<repo> branch=<branch> agent=<agent>")
+		_ = a.matrix.SendText(ctx, event.RoomID, "Governor room commands: /start repo=<repo> branch=<branch> agent=<agent> and /status")
 		return
 	}
 
-	if cmd.Name != sessions.CommandStart {
-		_ = a.matrix.SendText(ctx, event.RoomID, "Governor room only accepts /start commands")
+	switch cmd.Name {
+	case sessions.CommandStatus:
+		activeSessions := a.sessions.List()
+		if len(activeSessions) == 0 {
+			_ = a.matrix.SendText(ctx, event.RoomID, "No active sessions")
+			return
+		}
+
+		lines := []string{"Active sessions:"}
+		for _, session := range activeSessions {
+			lines = append(lines, fmt.Sprintf("- %s | %s | room=%s | repo=%s | branch=%s", session.ID, session.State, session.RoomID, session.Repo, session.Branch))
+		}
+		_ = a.matrix.SendText(ctx, event.RoomID, strings.Join(lines, "\n"))
+		return
+	case sessions.CommandStart:
+		// handled below
+	default:
+		_ = a.matrix.SendText(ctx, event.RoomID, "Governor room supports /start and /status")
 		return
 	}
 

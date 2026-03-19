@@ -50,3 +50,14 @@ func (s *SessionStore) Delete(id string) {
 	delete(s.byID, id)
 	delete(s.byRoom, session.RoomID)
 }
+
+func (s *SessionStore) List() []*sessions.Session {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	items := make([]*sessions.Session, 0, len(s.byID))
+	for _, session := range s.byID {
+		items = append(items, session)
+	}
+	return items
+}
