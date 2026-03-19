@@ -106,8 +106,14 @@ func collectProcessEnv(names []string) map[string]string {
 
 func normalizeCodexCommand(value string) string {
 	trimmed := strings.TrimSpace(value)
-	if trimmed == "" || trimmed == "codex" {
-		return "script -q -e -c \"codex --no-alt-screen\" /dev/null"
+	if trimmed == "" || trimmed == "codex" || strings.HasPrefix(trimmed, "codex ") {
+		inner := strings.TrimSpace(strings.TrimPrefix(trimmed, "codex"))
+		if inner == "" {
+			inner = "--no-alt-screen"
+		}
+		codexCommand := "codex " + inner
+		wrapped := "stty cols 120 rows 40 >/dev/null 2>&1 || true; " + codexCommand
+		return fmt.Sprintf("printenv OPENAI_API_KEY | codex login --with-api-key >/dev/null 2>&1 || true; script -q -e -c %q /dev/null", wrapped)
 	}
 	return trimmed
 }

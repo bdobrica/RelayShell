@@ -125,7 +125,7 @@ func (p *Process) WriteInput(input string) error {
 	if p.stdin == nil {
 		return errors.New("stdin is not available")
 	}
-	_, err := io.WriteString(p.stdin, input+"\n")
+	_, err := io.WriteString(p.stdin, input+"\r\n")
 	return err
 }
 

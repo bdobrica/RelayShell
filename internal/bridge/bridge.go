@@ -4,8 +4,8 @@ import (
 	"context"
 	"io"
 	"log/slog"
-	"regexp"
 	"strings"
+	"time"
 
 	"github.com/bdobrica/RelayShell/internal/container"
 )
@@ -14,12 +14,6 @@ type MatrixSender interface {
 	SendText(ctx context.Context, roomID, body string) error
 }
 
-var (
-	ansiOSCRegexp    = regexp.MustCompile(`\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)`)
-	ansiCSIRegexp    = regexp.MustCompile(`\x1b\[[0-?]*[ -/]*[@-~]`)
-	ansiSingleRegexp = regexp.MustCompile(`\x1b[@-_]`)
-)
-
 type Bridge struct {
 	logger *slog.Logger
 	sender MatrixSender
@@ -27,6 +21,8 @@ type Bridge struct {
 	proc   *container.Process
 	cancel context.CancelFunc
 }
+
+const outputBatchIdle = 300 * time.Millisecond
 
 func New(logger *slog.Logger, sender MatrixSender, roomID string, proc *container.Process) *Bridge {
 	return &Bridge{
@@ -57,61 +53,103 @@ func (b *Bridge) Stop() error {
 }
 
 func (b *Bridge) pumpOutput(ctx context.Context, reader io.Reader, prefix string) {
-	buffer := make([]byte, 4096)
-	pending := ""
+	chunkCh := make(chan string, 32)
+	errCh := make(chan error, 1)
 
-	flushPending := func(force bool) error {
-		if pending == "" {
+	go func() {
+		defer close(chunkCh)
+
+		buffer := make([]byte, 4096)
+		for {
+			n, err := reader.Read(buffer)
+			if n > 0 {
+				select {
+				case chunkCh <- string(buffer[:n]):
+				case <-ctx.Done():
+					return
+				}
+			}
+
+			if err != nil {
+				select {
+				case errCh <- err:
+				case <-ctx.Done():
+				}
+				return
+			}
+		}
+	}()
+
+	var batch strings.Builder
+	timer := time.NewTimer(outputBatchIdle)
+	if !timer.Stop() {
+		select {
+		case <-timer.C:
+		default:
+		}
+	}
+	timerActive := false
+
+	resetTimer := func() {
+		if timerActive {
+			if !timer.Stop() {
+				select {
+				case <-timer.C:
+				default:
+				}
+			}
+		}
+		timer.Reset(outputBatchIdle)
+		timerActive = true
+	}
+
+	flushBatch := func() error {
+		if batch.Len() == 0 {
 			return nil
 		}
 
-		for {
-			newlineIndex := strings.IndexByte(pending, '\n')
-			if newlineIndex < 0 {
-				if force {
-					chunk := sanitizeTerminalOutput(pending)
-					pending = ""
-					if chunk != "" {
-						if err := b.sender.SendText(ctx, b.roomID, prefix+chunk); err != nil {
-							return err
-						}
-					}
-				}
-				return nil
-			}
+		renderedLines := renderRawDebugToLines(batch.String())
+		batch.Reset()
 
-			line := sanitizeTerminalOutput(pending[:newlineIndex])
-			pending = pending[newlineIndex+1:]
-			if line == "" {
+		for _, line := range renderedLines {
+			if strings.TrimSpace(line) == "" {
 				continue
 			}
 			if err := b.sender.SendText(ctx, b.roomID, prefix+line); err != nil {
 				return err
 			}
 		}
+
+		return nil
 	}
+
+	defer timer.Stop()
 
 	for {
 		select {
 		case <-ctx.Done():
+			if err := flushBatch(); err != nil {
+				b.logger.Error("bridge flush output on cancel failed", "error", err)
+			}
 			return
-		default:
-		}
-
-		n, err := reader.Read(buffer)
-		if n > 0 {
-			pending += string(buffer[:n])
-			if err := flushPending(true); err != nil {
+		case chunk, ok := <-chunkCh:
+			if !ok {
+				chunkCh = nil
+				continue
+			}
+			batch.WriteString(chunk)
+			resetTimer()
+		case <-timer.C:
+			timerActive = false
+			if err := flushBatch(); err != nil {
 				b.logger.Error("bridge send output failed", "error", err)
 				return
 			}
-		}
-
-		if err != nil {
+		case err := <-errCh:
 			if err != io.EOF {
 				b.logger.Error("bridge reader failed", "error", err)
 			}
-			if err := flushPending(true); err != nil {
+			if err := flushBatch(); err != nil {
 				b.logger.Error("bridge flush output failed", "error", err)
 			}
 			return
@@ -120,9 +158,33 @@ func (b *Bridge) pumpOutput(ctx context.Context, reader io.Reader, prefix string
 }
 
 func sanitizeTerminalOutput(input string) string {
-	output := strings.ReplaceAll(input, "\r", "")
-	output = ansiOSCRegexp.ReplaceAllString(output, "")
-	output = ansiCSIRegexp.ReplaceAllString(output, "")
-	output = ansiSingleRegexp.ReplaceAllString(output, "")
-	return strings.TrimSpace(output)
+	output := normalizeSpaceHeavyLines(input)
+
+	// Collapse excessive blank lines produced by redraw-heavy outputs.
+	for strings.Contains(output, "\n\n\n") {
+		output = strings.ReplaceAll(output, "\n\n\n", "\n\n")
+	}
+	return output
+}
+
+func normalizeSpaceHeavyLines(input string) string {
+	lines := strings.Split(input, "\n")
+	for i, line := range lines {
+		line = strings.TrimRight(line, " ")
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" {
+			lines[i] = line
+			continue
+		}
+
+		leadingSpaces := len(line) - len(strings.TrimLeft(line, " "))
+		spaceCount := strings.Count(line, " ")
+		if leadingSpaces > 24 || spaceCount*3 >= len(line) {
+			line = strings.Join(strings.Fields(line), " ")
+		}
+
+		lines[i] = line
+	}
+
+	return strings.Join(lines, "\n")
 }

@@ -169,5 +169,9 @@ Then use that HTTPS URL in Element Web advanced login.
 - If governor fails with missing env vars: verify `.env` exists and required fields are set.
 - If codex fails to authenticate: verify `OPENAI_API_KEY` in `.env` and ensure it is listed in `RELAY_CONTAINER_PASSTHROUGH_ENV`.
 - If Matrix login/join fails: inspect homeserver logs with `make tuwunel-logs`.
-- Interactive bridge default: `RELAY_AGENT_CODEX_COMMAND` should be `script -q -e -c "codex --no-alt-screen" /dev/null` (legacy `codex` is auto-normalized to this value by governor).
+- Interactive bridge default: set `RELAY_AGENT_CODEX_COMMAND=codex` and governor will auto-normalize to:
+  1. `codex login --with-api-key` using `OPENAI_API_KEY`
+  2. `script -q -e -c 'codex --no-alt-screen' /dev/null`
+- If you see `the input device is not a TTY`, ensure worker containers are not started with `docker run -t` from the host process; use the wrapped command above and restart governor.
+- If Codex panics with `tui/src/wrapping.rs` / `byte index ... out of bounds`, restart session after this fix. Governor now sets terminal size (`stty cols 120 rows 40`) before launching Codex to avoid zero-width PTY issues.
 - If interactive behavior is still problematic in your environment, fallback to non-interactive mode: `while IFS= read -r line; do [ -z "$line" ] && continue; codex exec --skip-git-repo-check "$line"; done`.

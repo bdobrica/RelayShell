@@ -3,7 +3,7 @@ FROM node:22-alpine
 ARG CODEX_NPM_PACKAGE=@openai/codex
 ARG CODEX_NPM_VERSION=latest
 
-RUN apk add --no-cache bash git openssh-client ca-certificates tini util-linux \
+RUN apk add --no-cache bash git openssh-client ca-certificates tini util-linux bubblewrap \
  && npm install -g "${CODEX_NPM_PACKAGE}@${CODEX_NPM_VERSION}" \
  && codex --version
 
