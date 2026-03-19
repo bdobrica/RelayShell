@@ -175,3 +175,4 @@ Then use that HTTPS URL in Element Web advanced login.
 - If you see `the input device is not a TTY`, ensure worker containers are not started with `docker run -t` from the host process; use the wrapped command above and restart governor.
 - If Codex panics with `tui/src/wrapping.rs` / `byte index ... out of bounds`, restart session after this fix. Governor now sets terminal size (`stty cols 120 rows 40`) before launching Codex to avoid zero-width PTY issues.
 - If interactive behavior is still problematic in your environment, fallback to non-interactive mode: `while IFS= read -r line; do [ -z "$line" ] && continue; codex exec --skip-git-repo-check "$line"; done`.
+- Bridge flush timing is configurable via `RELAY_BRIDGE_OUTPUT_BATCH_IDLE_MS` (default `300`). Increase it to gather larger redraw batches, or decrease it for lower latency.

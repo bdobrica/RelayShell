@@ -3,7 +3,9 @@ package main
 import (
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/bdobrica/RelayShell/internal/matrixbot"
 )
@@ -19,6 +21,7 @@ type config struct {
 	CopilotCommand   string
 	ContainerEnv     map[string]string
 	AllowedUsers     map[string]struct{}
+	BridgeBatchIdle  time.Duration
 }
 
 func loadConfig() (config, error) {
@@ -44,6 +47,10 @@ func loadConfig() (config, error) {
 		"OPENAI_API_KEY,OPENAI_BASE_URL,OPENAI_ORG_ID,OPENAI_PROJECT",
 	))
 	containerEnv := collectProcessEnv(passthroughEnv)
+	bridgeBatchIdle, err := envDurationMS("RELAY_BRIDGE_OUTPUT_BATCH_IDLE_MS", 300)
+	if err != nil {
+		return config{}, err
+	}
 
 	allowedUsers := parseCSVSet(os.Getenv("RELAY_ALLOWED_USERS"))
 
@@ -63,7 +70,22 @@ func loadConfig() (config, error) {
 		CopilotCommand:   copilotCommand,
 		ContainerEnv:     containerEnv,
 		AllowedUsers:     allowedUsers,
+		BridgeBatchIdle:  bridgeBatchIdle,
 	}, nil
+}
+
+func envDurationMS(key string, defaultMS int) (time.Duration, error) {
+	value := strings.TrimSpace(os.Getenv(key))
+	if value == "" {
+		return time.Duration(defaultMS) * time.Millisecond, nil
+	}
+
+	ms, err := strconv.Atoi(value)
+	if err != nil || ms <= 0 {
+		return 0, fmt.Errorf("%s must be a positive integer (milliseconds)", key)
+	}
+
+	return time.Duration(ms) * time.Millisecond, nil
 }
 
 func envWithDefault(key, fallback string) string {

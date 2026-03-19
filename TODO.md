@@ -91,6 +91,7 @@ Core components:
 
 * [x] Accept free text messages
 * [x] Route to container
+* [ ] Add session command (`/enter`) to send raw Enter key to container stdin
 
 ---
 
@@ -105,6 +106,7 @@ Core components:
 
 * [ ] Strip ANSI sequences
 * [ ] Buffer output (300–1000ms)
+* [ ] Send Matrix typing indicator while output is buffering/waiting flush timeout
 * [ ] Chunk messages
 * [ ] Prevent message spam
 
@@ -181,6 +183,7 @@ Core components:
 * [ ] Add SQLite/Postgres
 * [ ] Persist sessions
 * [ ] Restore sessions on restart
+* [ ] Persist processed Matrix event IDs / checkpoints to prevent duplicate command replay after governor restart
 
 ---
 

@@ -15,21 +15,27 @@ type MatrixSender interface {
 }
 
 type Bridge struct {
-	logger *slog.Logger
-	sender MatrixSender
-	roomID string
-	proc   *container.Process
-	cancel context.CancelFunc
+	logger    *slog.Logger
+	sender    MatrixSender
+	roomID    string
+	proc      *container.Process
+	batchIdle time.Duration
+	cancel    context.CancelFunc
 }
 
-const outputBatchIdle = 300 * time.Millisecond
+const defaultOutputBatchIdle = 300 * time.Millisecond
 
-func New(logger *slog.Logger, sender MatrixSender, roomID string, proc *container.Process) *Bridge {
+func New(logger *slog.Logger, sender MatrixSender, roomID string, proc *container.Process, batchIdle time.Duration) *Bridge {
+	if batchIdle <= 0 {
+		batchIdle = defaultOutputBatchIdle
+	}
+
 	return &Bridge{
-		logger: logger,
-		sender: sender,
-		roomID: roomID,
-		proc:   proc,
+		logger:    logger,
+		sender:    sender,
+		roomID:    roomID,
+		proc:      proc,
+		batchIdle: batchIdle,
 	}
 }
 
@@ -81,7 +87,7 @@ func (b *Bridge) pumpOutput(ctx context.Context, reader io.Reader, prefix string
 	}()
 
 	var batch strings.Builder
-	timer := time.NewTimer(outputBatchIdle)
+	timer := time.NewTimer(b.batchIdle)
 	if !timer.Stop() {
 		select {
 		case <-timer.C:
@@ -99,7 +105,7 @@ func (b *Bridge) pumpOutput(ctx context.Context, reader io.Reader, prefix string
 				}
 			}
 		}
-		timer.Reset(outputBatchIdle)
+		timer.Reset(b.batchIdle)
 		timerActive = true
 	}
 
