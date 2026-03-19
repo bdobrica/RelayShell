@@ -5,16 +5,16 @@ services:
       dockerfile: Dockerfile.tuwunel
     container_name: relayshell-tuwunel
     environment:
-      CONDUWUIT_SERVER_NAME: localhost
-      CONDUWUIT_DATABASE_PATH: /var/lib/tuwunel
-      CONDUWUIT_PORT: 8008
-      CONDUWUIT_ALLOW_REGISTRATION: "true"
-      CONDUWUIT_REGISTRATION_TOKEN: integration-test-token
-      CONDUWUIT_ALLOW_FEDERATION: "false"
-      CONDUWUIT_ALLOW_PUBLIC_ROOM_DIRECTORY: "false"
-      CONDUWUIT_LOG: info
+      CONDUWUIT_SERVER_NAME: ${CONDUWUIT_SERVER_NAME:-localhost}
+      CONDUWUIT_DATABASE_PATH: ${CONDUWUIT_DATABASE_PATH:-/var/lib/tuwunel}
+      CONDUWUIT_PORT: ${CONDUWUIT_PORT:-8008}
+      CONDUWUIT_ALLOW_REGISTRATION: ${CONDUWUIT_ALLOW_REGISTRATION:-true}
+      CONDUWUIT_REGISTRATION_TOKEN: ${CONDUWUIT_REGISTRATION_TOKEN:-integration-test-token}
+      CONDUWUIT_ALLOW_FEDERATION: ${CONDUWUIT_ALLOW_FEDERATION:-false}
+      CONDUWUIT_ALLOW_PUBLIC_ROOM_DIRECTORY: ${CONDUWUIT_ALLOW_PUBLIC_ROOM_DIRECTORY:-false}
+      CONDUWUIT_LOG: ${CONDUWUIT_LOG:-info}
     ports:
-      - "8008:8008"
+      - "${CONDUWUIT_PORT:-8008}:8008"
     volumes:
       - tuwunel-data:/var/lib/tuwunel
     healthcheck:
