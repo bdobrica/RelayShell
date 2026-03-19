@@ -1,214 +1,200 @@
 package bridge
 
 import (
+	"sort"
 	"strconv"
 	"strings"
 	"unicode"
 	"unicode/utf8"
 )
 
-type ansiRenderer struct {
-	line    []rune
-	cursor  int
-	pending string
+type ansiScreen struct {
+	rows map[int][]rune
+	row  int
+	col  int
 }
 
-func newANSIRenderer() *ansiRenderer {
-	return &ansiRenderer{line: make([]rune, 0, 128)}
-}
-
-func (r *ansiRenderer) Feed(input string) []string {
-	data := r.pending + input
-	r.pending = ""
-
-	lines := make([]string, 0)
-	i := 0
-	for i < len(data) {
-		ch := data[i]
-
-		switch ch {
-		case '\n':
-			lines = append(lines, r.flushLine())
-			i++
-		case '\r':
-			r.cursor = 0
-			i++
-		case '\t':
-			for t := 0; t < 4; t++ {
-				r.writeRune(' ')
-			}
-			i++
-		case '\b':
-			if r.cursor > 0 {
-				r.cursor--
-			}
-			i++
-		case 0x1b:
-			next, consumed, incomplete := r.consumeEscape(data[i:])
-			if incomplete {
-				r.pending = data[i:]
-				return lines
-			}
-			i += consumed
-			if next != 0 {
-				// Reserved for future single-escape behaviors.
-			}
-		default:
-			if !utf8.FullRuneInString(data[i:]) {
-				r.pending = data[i:]
-				return lines
-			}
-			rn, size := utf8.DecodeRuneInString(data[i:])
-			i += size
-			if rn == utf8.RuneError && size == 1 {
-				continue
-			}
-			if rn >= 0x20 {
-				r.writeRune(rn)
-			}
-		}
-	}
-
-	return lines
-}
-
-func (r *ansiRenderer) CurrentLine() string {
-	return strings.TrimRight(string(r.line), " ")
-}
-
-func (r *ansiRenderer) FinalLine() string {
-	r.pending = ""
-	return r.CurrentLine()
-}
-
-func (r *ansiRenderer) consumeEscape(data string) (byte, int, bool) {
-	if len(data) < 2 {
-		return 0, 0, true
-	}
-
-	next := data[1]
-	switch next {
-	case ']':
-		// OSC: ESC ] ... BEL or ESC \
-		i := 2
-		for i < len(data) {
-			if data[i] == '\a' {
-				return 0, i + 1, false
-			}
-			if data[i] == 0x1b && i+1 < len(data) && data[i+1] == '\\' {
-				return 0, i + 2, false
-			}
-			i++
-		}
-		return 0, 0, true
-	case '[':
-		i := 2
-		for i < len(data) {
-			b := data[i]
-			if b >= '@' && b <= '~' {
-				params := data[2:i]
-				r.applyCSI(params, b)
-				return 0, i + 1, false
-			}
-			i++
-		}
-		return 0, 0, true
-	default:
-		return next, 2, false
+func newANSIScreen() *ansiScreen {
+	return &ansiScreen{
+		rows: make(map[int][]rune),
 	}
 }
 
-func (r *ansiRenderer) applyCSI(params string, final byte) {
+func (s *ansiScreen) writeRune(ch rune) {
+	s.ensureRowCol()
+	line := s.rows[s.row]
+	if s.col < len(line) {
+		line[s.col] = ch
+	} else {
+		line = append(line, ch)
+	}
+	s.rows[s.row] = line
+	s.col++
+}
+
+func (s *ansiScreen) ensureRowCol() {
+	if s.row < 0 {
+		s.row = 0
+	}
+	if s.col < 0 {
+		s.col = 0
+	}
+	line := s.rows[s.row]
+	for len(line) < s.col {
+		line = append(line, ' ')
+	}
+	s.rows[s.row] = line
+}
+
+func (s *ansiScreen) applyCSI(params string, final byte) {
 	n := parseCSIParam(params, 1)
 	switch final {
+	case 'A':
+		s.row -= n
+		if s.row < 0 {
+			s.row = 0
+		}
+	case 'B':
+		s.row += n
 	case 'C':
-		r.cursor += n
+		s.col += n
 	case 'D':
-		r.cursor -= n
-		if r.cursor < 0 {
-			r.cursor = 0
+		s.col -= n
+		if s.col < 0 {
+			s.col = 0
 		}
 	case 'G':
 		if n > 0 {
-			r.cursor = n - 1
+			s.col = n - 1
 		}
+	case 'H', 'f':
+		row, col := parseCursorPos(params)
+		s.row = row - 1
+		s.col = col - 1
 	case 'K':
-		mode := parseCSIParam(params, 0)
-		r.ensureCursor()
-		switch mode {
-		case 0:
-			if r.cursor < len(r.line) {
-				r.line = r.line[:r.cursor]
-			}
-		case 1:
-			for j := 0; j < r.cursor && j < len(r.line); j++ {
-				r.line[j] = ' '
-			}
-		case 2:
-			r.line = r.line[:0]
-			r.cursor = 0
-		}
+		s.applyEraseInLine(parseCSIParam(params, 0))
+	case 'J':
+		s.applyEraseInDisplay(parseCSIParam(params, 0))
 	case 'P':
-		if r.cursor < len(r.line) {
-			end := r.cursor + n
-			if end > len(r.line) {
-				end = len(r.line)
-			}
-			r.line = append(r.line[:r.cursor], r.line[end:]...)
-		}
+		s.applyDeleteChars(n)
 	case '@':
-		r.ensureCursor()
-		if n > 0 {
-			insert := make([]rune, n)
-			for j := range insert {
-				insert[j] = ' '
-			}
-			r.line = append(r.line[:r.cursor], append(insert, r.line[r.cursor:]...)...)
-		}
+		s.applyInsertSpaces(n)
 	case 'X':
-		r.ensureCursor()
-		for j := 0; j < n; j++ {
-			pos := r.cursor + j
-			if pos >= len(r.line) {
-				break
-			}
-			r.line[pos] = ' '
-		}
+		s.applyEraseChars(n)
 	case 'm', 'h', 'l', 's', 'u':
 		// Formatting and mode toggles don't affect plain text rendering.
-	case 'H', 'f':
-		parts := strings.Split(params, ";")
-		col := 1
-		if len(parts) >= 2 {
-			if parsed, err := strconv.Atoi(strings.TrimPrefix(parts[1], "?")); err == nil && parsed > 0 {
-				col = parsed
-			}
+	}
+}
+
+func (s *ansiScreen) applyEraseInLine(mode int) {
+	s.ensureRowCol()
+	line := s.rows[s.row]
+	switch mode {
+	case 0:
+		if s.col < len(line) {
+			line = line[:s.col]
 		}
-		r.cursor = col - 1
+	case 1:
+		for i := 0; i <= s.col && i < len(line); i++ {
+			line[i] = ' '
+		}
+	case 2:
+		line = line[:0]
+		s.col = 0
+	}
+	s.rows[s.row] = line
+}
+
+func (s *ansiScreen) applyEraseInDisplay(mode int) {
+	switch mode {
+	case 2:
+		s.rows = make(map[int][]rune)
+		s.row = 0
+		s.col = 0
+	case 0:
+		s.applyEraseInLine(0)
+		for r := s.row + 1; ; r++ {
+			if _, ok := s.rows[r]; !ok {
+				break
+			}
+			delete(s.rows, r)
+		}
+	case 1:
+		s.applyEraseInLine(1)
+		for r := 0; r < s.row; r++ {
+			delete(s.rows, r)
+		}
 	}
 }
 
-func (r *ansiRenderer) ensureCursor() {
-	for len(r.line) < r.cursor {
-		r.line = append(r.line, ' ')
+func (s *ansiScreen) applyDeleteChars(n int) {
+	if n <= 0 {
+		return
 	}
+	s.ensureRowCol()
+	line := s.rows[s.row]
+	if s.col >= len(line) {
+		return
+	}
+	end := s.col + n
+	if end > len(line) {
+		end = len(line)
+	}
+	line = append(line[:s.col], line[end:]...)
+	s.rows[s.row] = line
 }
 
-func (r *ansiRenderer) writeRune(ch rune) {
-	r.ensureCursor()
-	if r.cursor < len(r.line) {
-		r.line[r.cursor] = ch
-	} else {
-		r.line = append(r.line, ch)
+func (s *ansiScreen) applyInsertSpaces(n int) {
+	if n <= 0 {
+		return
 	}
-	r.cursor++
+	s.ensureRowCol()
+	line := s.rows[s.row]
+	insert := make([]rune, n)
+	for i := range insert {
+		insert[i] = ' '
+	}
+	line = append(line[:s.col], append(insert, line[s.col:]...)...)
+	s.rows[s.row] = line
 }
 
-func (r *ansiRenderer) flushLine() string {
-	line := r.CurrentLine()
-	r.line = r.line[:0]
-	r.cursor = 0
-	return line
+func (s *ansiScreen) applyEraseChars(n int) {
+	if n <= 0 {
+		return
+	}
+	s.ensureRowCol()
+	line := s.rows[s.row]
+	for i := 0; i < n; i++ {
+		pos := s.col + i
+		if pos >= len(line) {
+			break
+		}
+		line[pos] = ' '
+	}
+	s.rows[s.row] = line
+}
+
+func (s *ansiScreen) lines() []string {
+	if len(s.rows) == 0 {
+		return nil
+	}
+
+	keys := make([]int, 0, len(s.rows))
+	for row := range s.rows {
+		keys = append(keys, row)
+	}
+	sort.Ints(keys)
+
+	out := make([]string, 0, len(keys))
+	for _, row := range keys {
+		line := strings.TrimRight(string(s.rows[row]), " ")
+		if strings.TrimSpace(line) == "" {
+			continue
+		}
+		out = append(out, line)
+	}
+
+	return out
 }
 
 func parseCSIParam(params string, defaultValue int) int {
@@ -231,12 +217,110 @@ func parseCSIParam(params string, defaultValue int) int {
 }
 
 func renderBatchToLines(input string) []string {
-	r := newANSIRenderer()
-	lines := r.Feed(input)
-	if tail := r.FinalLine(); tail != "" {
-		lines = append(lines, tail)
+	s := newANSIScreen()
+	i := 0
+	for i < len(input) {
+		ch := input[i]
+
+		switch ch {
+		case '\n':
+			s.row++
+			s.col = 0
+			i++
+		case '\r':
+			s.col = 0
+			i++
+		case '\t':
+			for t := 0; t < 4; t++ {
+				s.writeRune(' ')
+			}
+			i++
+		case '\b':
+			if s.col > 0 {
+				s.col--
+			}
+			i++
+		case 0x1b:
+			consumed := consumeANSIEscape(input[i:], s)
+			if consumed <= 0 {
+				i++
+				continue
+			}
+			i += consumed
+		default:
+			if !utf8.FullRuneInString(input[i:]) {
+				i++
+				continue
+			}
+			r, size := utf8.DecodeRuneInString(input[i:])
+			i += size
+			if r == utf8.RuneError && size == 1 {
+				continue
+			}
+			if r >= 0x20 {
+				s.writeRune(r)
+			}
+		}
 	}
-	return lines
+
+	return s.lines()
+}
+
+func consumeANSIEscape(input string, s *ansiScreen) int {
+	if len(input) < 2 {
+		return 1
+	}
+
+	next := input[1]
+	switch next {
+	case ']':
+		// OSC: ESC ] ... BEL or ESC \
+		i := 2
+		for i < len(input) {
+			if input[i] == '\a' {
+				return i + 1
+			}
+			if input[i] == 0x1b && i+1 < len(input) && input[i+1] == '\\' {
+				return i + 2
+			}
+			i++
+		}
+		return len(input)
+	case '[':
+		i := 2
+		for i < len(input) {
+			b := input[i]
+			if b >= '@' && b <= '~' {
+				params := input[2:i]
+				s.applyCSI(params, b)
+				return i + 1
+			}
+			i++
+		}
+		return len(input)
+	default:
+		return 2
+	}
+}
+
+func parseCursorPos(params string) (int, int) {
+	row := 1
+	col := 1
+	if params == "" {
+		return row, col
+	}
+	parts := strings.Split(params, ";")
+	if len(parts) >= 1 && strings.TrimPrefix(parts[0], "?") != "" {
+		if parsed, err := strconv.Atoi(strings.TrimPrefix(parts[0], "?")); err == nil && parsed > 0 {
+			row = parsed
+		}
+	}
+	if len(parts) >= 2 && strings.TrimPrefix(parts[1], "?") != "" {
+		if parsed, err := strconv.Atoi(strings.TrimPrefix(parts[1], "?")); err == nil && parsed > 0 {
+			col = parsed
+		}
+	}
+	return row, col
 }
 
 func renderRawDebugToLines(input string) []string {

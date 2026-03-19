@@ -108,7 +108,7 @@ func (b *Bridge) pumpOutput(ctx context.Context, reader io.Reader, prefix string
 			return nil
 		}
 
-		renderedLines := renderRawDebugToLines(batch.String())
+		renderedLines := renderBatchToLines(batch.String())
 		batch.Reset()
 
 		for _, line := range renderedLines {
