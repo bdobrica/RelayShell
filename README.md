@@ -186,6 +186,25 @@ make lint
 make build
 ```
 
+### Run Governor (Phase 1 Prototype)
+
+```bash
+export RELAY_MATRIX_HOMESERVER="http://localhost:8008"
+export RELAY_MATRIX_USER_ID="@relayshell:localhost"
+export RELAY_MATRIX_ACCESS_TOKEN="YOUR_ACCESS_TOKEN"
+export RELAY_MATRIX_GOVERNOR_ROOM_ID="!governorRoomId:localhost"
+
+# Optional overrides
+export RELAY_WORKSPACE_BASE_DIR="/tmp/relayshell"
+export RELAY_CONTAINER_RUNTIME="docker"
+export RELAY_CONTAINER_IMAGE="alpine:3.20"
+export RELAY_ALLOWED_USERS="@yourUser:localhost"
+
+make run
+```
+
+Phase 1 uses a minimal container command mapping for `codex` and `copilot` (`cat`) to validate end-to-end Matrix-to-container bridging before real agent backends are added.
+
 ### Config Example
 
 ```yaml

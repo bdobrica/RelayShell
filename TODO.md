@@ -44,53 +44,53 @@ Core components:
 
 ### Matrix Bot
 
-* [ ] Connect to Matrix homeserver
-* [ ] Join a predefined Governor room
-* [ ] Listen for messages
-* [ ] Send messages to room
+* [x] Connect to Matrix homeserver
+* [x] Join a predefined Governor room
+* [x] Listen for messages
+* [x] Send messages to room
 
 ### Command Parsing
 
-* [ ] Implement strict command parser
+* [x] Implement strict command parser
 
-  * [ ] /start repo=<repo> branch=<branch> agent=<agent>
-  * [ ] /restart
-  * [ ] /exit
-  * [ ] /commit
-* [ ] Reject non-command messages in Governor room
+  * [x] /start repo=<repo> branch=<branch> agent=<agent>
+  * [x] /restart
+  * [x] /exit
+  * [x] /commit
+* [x] Reject non-command messages in Governor room
 
 ### Session Model
 
-* [ ] Define Session struct
-* [ ] In-memory session store
-* [ ] Map roomID -> session
+* [x] Define Session struct
+* [x] In-memory session store
+* [x] Map roomID -> session
 
 ### Room Management
 
-* [ ] Create new Matrix room per session
-* [ ] Invite user to room
-* [ ] Post session metadata message
+* [x] Create new Matrix room per session
+* [x] Invite user to room
+* [x] Post session metadata message
 
 ### Git Workspace (basic)
 
-* [ ] Clone repo into temp directory
-* [ ] Checkout requested branch
+* [x] Clone repo into temp directory
+* [x] Checkout requested branch
 
 ### Container Runner (basic)
 
-* [ ] Start container for agent
-* [ ] Mount workspace
-* [ ] Attach stdin/stdout
+* [x] Start container for agent
+* [x] Mount workspace
+* [x] Attach stdin/stdout
 
 ### Bridge (basic)
 
-* [ ] Forward Matrix messages -> container stdin
-* [ ] Forward container stdout -> Matrix messages
+* [x] Forward Matrix messages -> container stdin
+* [x] Forward container stdout -> Matrix messages
 
 ### Agent Room Handling
 
-* [ ] Accept free text messages
-* [ ] Route to container
+* [x] Accept free text messages
+* [x] Route to container
 
 ---
 

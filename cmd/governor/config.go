@@ -1,0 +1,67 @@
+package main
+
+import (
+	"fmt"
+	"os"
+	"strings"
+
+	"github.com/bdobrica/RelayShell/internal/matrixbot"
+)
+
+type config struct {
+	Matrix           matrixbot.Config
+	WorkspaceBaseDir string
+	ContainerRuntime string
+	ContainerImage   string
+	AllowedUsers     map[string]struct{}
+}
+
+func loadConfig() (config, error) {
+	homeserver := strings.TrimSpace(os.Getenv("RELAY_MATRIX_HOMESERVER"))
+	userID := strings.TrimSpace(os.Getenv("RELAY_MATRIX_USER_ID"))
+	accessToken := strings.TrimSpace(os.Getenv("RELAY_MATRIX_ACCESS_TOKEN"))
+	governorRoomID := strings.TrimSpace(os.Getenv("RELAY_MATRIX_GOVERNOR_ROOM_ID"))
+
+	if homeserver == "" || userID == "" || accessToken == "" || governorRoomID == "" {
+		return config{}, fmt.Errorf("missing required matrix config: RELAY_MATRIX_HOMESERVER, RELAY_MATRIX_USER_ID, RELAY_MATRIX_ACCESS_TOKEN, RELAY_MATRIX_GOVERNOR_ROOM_ID")
+	}
+
+	workspaceBaseDir := envWithDefault("RELAY_WORKSPACE_BASE_DIR", "/tmp/relayshell")
+	containerRuntime := envWithDefault("RELAY_CONTAINER_RUNTIME", "docker")
+	containerImage := envWithDefault("RELAY_CONTAINER_IMAGE", "alpine:3.20")
+
+	allowedUsers := parseCSVSet(os.Getenv("RELAY_ALLOWED_USERS"))
+
+	return config{
+		Matrix: matrixbot.Config{
+			HomeserverURL:  homeserver,
+			UserID:         userID,
+			AccessToken:    accessToken,
+			GovernorRoomID: governorRoomID,
+		},
+		WorkspaceBaseDir: workspaceBaseDir,
+		ContainerRuntime: containerRuntime,
+		ContainerImage:   containerImage,
+		AllowedUsers:     allowedUsers,
+	}, nil
+}
+
+func envWithDefault(key, fallback string) string {
+	value := strings.TrimSpace(os.Getenv(key))
+	if value == "" {
+		return fallback
+	}
+	return value
+}
+
+func parseCSVSet(value string) map[string]struct{} {
+	set := map[string]struct{}{}
+	for _, item := range strings.Split(value, ",") {
+		trimmed := strings.TrimSpace(item)
+		if trimmed == "" {
+			continue
+		}
+		set[trimmed] = struct{}{}
+	}
+	return set
+}
