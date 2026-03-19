@@ -159,9 +159,9 @@ Core components:
 
 ### Codex Backend
 
-* [ ] Container image
-* [ ] CLI entrypoint
-* [ ] Auth handling
+* [x] Container image
+* [x] CLI entrypoint
+* [x] Auth handling
 
 ### Copilot Backend
 

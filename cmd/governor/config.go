@@ -13,6 +13,11 @@ type config struct {
 	WorkspaceBaseDir string
 	ContainerRuntime string
 	ContainerImage   string
+	CodexImage       string
+	CodexCommand     string
+	CopilotImage     string
+	CopilotCommand   string
+	ContainerEnv     map[string]string
 	AllowedUsers     map[string]struct{}
 }
 
@@ -29,6 +34,16 @@ func loadConfig() (config, error) {
 	workspaceBaseDir := envWithDefault("RELAY_WORKSPACE_BASE_DIR", "/tmp/relayshell")
 	containerRuntime := envWithDefault("RELAY_CONTAINER_RUNTIME", "docker")
 	containerImage := envWithDefault("RELAY_CONTAINER_IMAGE", "alpine:3.20")
+	codexImage := envWithDefault("RELAY_AGENT_CODEX_IMAGE", "relayshell-codex:latest")
+	codexCommand := envWithDefault("RELAY_AGENT_CODEX_COMMAND", "codex")
+	copilotImage := envWithDefault("RELAY_AGENT_COPILOT_IMAGE", containerImage)
+	copilotCommand := envWithDefault("RELAY_AGENT_COPILOT_COMMAND", "cat")
+
+	passthroughEnv := parseCSVList(envWithDefault(
+		"RELAY_CONTAINER_PASSTHROUGH_ENV",
+		"OPENAI_API_KEY,OPENAI_BASE_URL,OPENAI_ORG_ID,OPENAI_PROJECT",
+	))
+	containerEnv := collectProcessEnv(passthroughEnv)
 
 	allowedUsers := parseCSVSet(os.Getenv("RELAY_ALLOWED_USERS"))
 
@@ -42,6 +57,11 @@ func loadConfig() (config, error) {
 		WorkspaceBaseDir: workspaceBaseDir,
 		ContainerRuntime: containerRuntime,
 		ContainerImage:   containerImage,
+		CodexImage:       codexImage,
+		CodexCommand:     codexCommand,
+		CopilotImage:     copilotImage,
+		CopilotCommand:   copilotCommand,
+		ContainerEnv:     containerEnv,
 		AllowedUsers:     allowedUsers,
 	}, nil
 }
@@ -56,12 +76,30 @@ func envWithDefault(key, fallback string) string {
 
 func parseCSVSet(value string) map[string]struct{} {
 	set := map[string]struct{}{}
+	for _, item := range parseCSVList(value) {
+		set[item] = struct{}{}
+	}
+	return set
+}
+
+func parseCSVList(value string) []string {
+	items := make([]string, 0)
 	for _, item := range strings.Split(value, ",") {
 		trimmed := strings.TrimSpace(item)
 		if trimmed == "" {
 			continue
 		}
-		set[trimmed] = struct{}{}
+		items = append(items, trimmed)
 	}
-	return set
+	return items
+}
+
+func collectProcessEnv(names []string) map[string]string {
+	env := map[string]string{}
+	for _, name := range names {
+		if value, ok := os.LookupEnv(name); ok && strings.TrimSpace(value) != "" {
+			env[name] = value
+		}
+	}
+	return env
 }

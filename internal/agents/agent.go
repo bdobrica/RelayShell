@@ -5,13 +5,39 @@ import (
 	"strings"
 )
 
-// CommandFor returns the shell command that should be executed in the agent container.
-func CommandFor(agent string) (string, error) {
+type Spec struct {
+	Image   string
+	Command string
+}
+
+type Resolver struct {
+	DefaultImage   string
+	CodexImage     string
+	CodexCommand   string
+	CopilotImage   string
+	CopilotCommand string
+}
+
+func (r Resolver) Resolve(agent string) (Spec, error) {
 	switch strings.ToLower(strings.TrimSpace(agent)) {
-	case "codex", "copilot":
-		// Phase 1 uses a simple echo-like process to validate end-to-end bridging.
-		return "cat", nil
+	case "codex":
+		return Spec{
+			Image:   coalesce(r.CodexImage, r.DefaultImage),
+			Command: coalesce(r.CodexCommand, "codex"),
+		}, nil
+	case "copilot":
+		return Spec{
+			Image:   coalesce(r.CopilotImage, r.DefaultImage),
+			Command: coalesce(r.CopilotCommand, "cat"),
+		}, nil
 	default:
-		return "", fmt.Errorf("unsupported agent %q", agent)
+		return Spec{}, fmt.Errorf("unsupported agent %q", agent)
 	}
+}
+
+func coalesce(value, fallback string) string {
+	if strings.TrimSpace(value) == "" {
+		return fallback
+	}
+	return value
 }

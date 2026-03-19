@@ -8,21 +8,27 @@ import (
 	"log/slog"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"sync"
 	"syscall"
 	"time"
-
-	"github.com/bdobrica/RelayShell/internal/agents"
 )
 
 type Runner struct {
 	Runtime string
-	Image   string
 	Logger  *slog.Logger
 }
 
-func NewRunner(runtime, image string, logger *slog.Logger) *Runner {
-	return &Runner{Runtime: runtime, Image: image, Logger: logger}
+func NewRunner(runtime string, logger *slog.Logger) *Runner {
+	return &Runner{Runtime: runtime, Logger: logger}
+}
+
+type StartOptions struct {
+	SessionID    string
+	WorkspaceDir string
+	Image        string
+	Command      string
+	Env          map[string]string
 }
 
 type Process struct {
@@ -34,13 +40,8 @@ type Process struct {
 	once   sync.Once
 }
 
-func (r *Runner) Start(ctx context.Context, agent, workspaceDir string) (*Process, error) {
-	entrypoint, err := agents.CommandFor(agent)
-	if err != nil {
-		return nil, err
-	}
-
-	absWorkspaceDir, err := filepath.Abs(workspaceDir)
+func (r *Runner) Start(ctx context.Context, options StartOptions) (*Process, error) {
+	absWorkspaceDir, err := filepath.Abs(options.WorkspaceDir)
 	if err != nil {
 		return nil, fmt.Errorf("resolve workspace path: %w", err)
 	}
@@ -49,15 +50,24 @@ func (r *Runner) Start(ctx context.Context, agent, workspaceDir string) (*Proces
 		"run",
 		"--rm",
 		"-i",
+		"--name",
+		"relayshell-" + options.SessionID,
 		"-v",
 		fmt.Sprintf("%s:/workspace", absWorkspaceDir),
 		"-w",
 		"/workspace",
-		r.Image,
+	}
+
+	for _, envVar := range sortedEnvFlags(options.Env) {
+		args = append(args, "-e", envVar)
+	}
+
+	args = append(args,
+		options.Image,
 		"sh",
 		"-lc",
-		entrypoint,
-	}
+		options.Command,
+	)
 
 	cmd := exec.CommandContext(ctx, r.Runtime, args...)
 
@@ -92,6 +102,23 @@ func (r *Runner) Start(ctx context.Context, agent, workspaceDir string) (*Proces
 	}()
 
 	return process, nil
+}
+
+func sortedEnvFlags(values map[string]string) []string {
+	if len(values) == 0 {
+		return nil
+	}
+	keys := make([]string, 0, len(values))
+	for key := range values {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+
+	result := make([]string, 0, len(keys))
+	for _, key := range keys {
+		result = append(result, fmt.Sprintf("%s=%s", key, values[key]))
+	}
+	return result
 }
 
 func (p *Process) WriteInput(input string) error {

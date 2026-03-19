@@ -186,6 +186,12 @@ make lint
 make build
 ```
 
+### Build Codex Worker Image
+
+```bash
+make build-codex-image
+```
+
 ### Run Governor (Phase 1 Prototype)
 
 ```bash
@@ -198,12 +204,19 @@ export RELAY_MATRIX_GOVERNOR_ROOM_ID="!governorRoomId:localhost"
 export RELAY_WORKSPACE_BASE_DIR="/tmp/relayshell"
 export RELAY_CONTAINER_RUNTIME="docker"
 export RELAY_CONTAINER_IMAGE="alpine:3.20"
+export RELAY_AGENT_CODEX_IMAGE="relayshell-codex:latest"
+export RELAY_AGENT_CODEX_COMMAND="codex"
+export RELAY_CONTAINER_PASSTHROUGH_ENV="OPENAI_API_KEY,OPENAI_BASE_URL,OPENAI_ORG_ID,OPENAI_PROJECT"
 export RELAY_ALLOWED_USERS="@yourUser:localhost"
+
+# Required for Codex
+export OPENAI_API_KEY="YOUR_OPENAI_API_KEY"
 
 make run
 ```
 
-Phase 1 uses a minimal container command mapping for `codex` and `copilot` (`cat`) to validate end-to-end Matrix-to-container bridging before real agent backends are added.
+`codex` sessions run inside the dedicated Codex container image and execute the configured Codex command.
+`copilot` remains a placeholder mapping (`cat`) until the Copilot backend is implemented.
 
 ### Config Example
 

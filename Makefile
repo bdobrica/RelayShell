@@ -6,7 +6,7 @@ ifeq ($(GOLANGCI_LINT),)
 GOLANGCI_LINT := $(shell go env GOPATH)/bin/golangci-lint
 endif
 
-.PHONY: all build run test lint fmt tidy install-tools
+.PHONY: all build run test lint fmt tidy install-tools build-codex-image
 
 all: build
 
@@ -30,3 +30,6 @@ fmt:
 
 tidy:
 	go mod tidy
+
+build-codex-image:
+	docker build -f Dockerfile.codex -t relayshell-codex:latest .

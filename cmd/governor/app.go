@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/bdobrica/RelayShell/internal/agents"
 	"github.com/bdobrica/RelayShell/internal/bridge"
 	"github.com/bdobrica/RelayShell/internal/container"
 	"github.com/bdobrica/RelayShell/internal/gitops"
@@ -24,6 +25,7 @@ type app struct {
 	matrix   *matrixbot.Client
 	git      *gitops.Manager
 	runner   *container.Runner
+	agents   agents.Resolver
 	sessions *store.SessionStore
 
 	bridgeMu sync.RWMutex
@@ -37,11 +39,18 @@ func newApp(cfg config, logger *slog.Logger) (*app, error) {
 	}
 
 	return &app{
-		cfg:      cfg,
-		logger:   logger,
-		matrix:   matrixClient,
-		git:      gitops.NewManager(cfg.WorkspaceBaseDir),
-		runner:   container.NewRunner(cfg.ContainerRuntime, cfg.ContainerImage, logger.With("component", "container")),
+		cfg:    cfg,
+		logger: logger,
+		matrix: matrixClient,
+		git:    gitops.NewManager(cfg.WorkspaceBaseDir),
+		runner: container.NewRunner(cfg.ContainerRuntime, logger.With("component", "container")),
+		agents: agents.Resolver{
+			DefaultImage:   cfg.ContainerImage,
+			CodexImage:     cfg.CodexImage,
+			CodexCommand:   cfg.CodexCommand,
+			CopilotImage:   cfg.CopilotImage,
+			CopilotCommand: cfg.CopilotCommand,
+		},
 		sessions: store.NewSessionStore(),
 		bridges:  map[string]*bridge.Bridge{},
 	}, nil
@@ -198,7 +207,19 @@ func (a *app) startSession(ctx context.Context, ownerUserID string, cmd sessions
 	session.RoomID = roomID
 
 	session.State = sessions.StateStartingContainer
-	proc, err := a.runner.Start(ctx, session.Agent, session.WorkspaceDir)
+	agentSpec, err := a.agents.Resolve(session.Agent)
+	if err != nil {
+		session.State = sessions.StateFailed
+		return nil, err
+	}
+
+	proc, err := a.runner.Start(ctx, container.StartOptions{
+		SessionID:    session.ID,
+		WorkspaceDir: session.WorkspaceDir,
+		Image:        agentSpec.Image,
+		Command:      agentSpec.Command,
+		Env:          a.cfg.ContainerEnv,
+	})
 	if err != nil {
 		session.State = sessions.StateFailed
 		return nil, err
@@ -231,7 +252,21 @@ func (a *app) restartSession(ctx context.Context, session *sessions.Session) {
 		_ = oldBridge.Stop()
 	}
 
-	proc, err := a.runner.Start(ctx, session.Agent, session.WorkspaceDir)
+	agentSpec, err := a.agents.Resolve(session.Agent)
+	if err != nil {
+		session.State = sessions.StateFailed
+		a.logger.Error("agent resolution failed", "session_id", session.ID, "error", err)
+		_ = a.matrix.SendText(ctx, session.RoomID, "Failed to resolve agent runtime")
+		return
+	}
+
+	proc, err := a.runner.Start(ctx, container.StartOptions{
+		SessionID:    session.ID,
+		WorkspaceDir: session.WorkspaceDir,
+		Image:        agentSpec.Image,
+		Command:      agentSpec.Command,
+		Env:          a.cfg.ContainerEnv,
+	})
 	if err != nil {
 		session.State = sessions.StateFailed
 		a.logger.Error("restart session failed", "session_id", session.ID, "error", err)
