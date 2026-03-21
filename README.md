@@ -261,11 +261,10 @@ Completed items are tracked in `CHANGELOG.md`.
 
 ### In Progress
 
-* [ ] True PTY integration (currently raw stdio with terminal-command workaround)
-* [ ] Container crash detection and automatic session-state handling
+* [ ] Interactive behavior tuning for redraw-heavy workloads
 * [ ] Matrix reconnect backoff/recovery strategy
 * [ ] `/commit` implementation
-* [ ] `/exit` workspace cleanup
+* [ ] Session stop/exit room archival policy
 
 ### Planned
 

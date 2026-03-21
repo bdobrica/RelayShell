@@ -4,6 +4,11 @@
 
 Completed roadmap items were moved from `TODO.md` to keep the active TODO focused.
 
+### Follow-up Fixes
+
+- Added session workspace cleanup on `/exit` session stop path.
+- Added process exit watcher to detect unexpected container exits, transition session state, and notify the session room.
+
 ### Completed
 
 - Phase 0: project/module structure initialized.

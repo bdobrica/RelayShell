@@ -3,6 +3,15 @@
 Date: 2026-03-21
 Scope: Current main branch implementation audited against TODO.md roadmap and runtime behavior.
 
+## Post-Review Remediation Update
+
+- Implemented workspace cleanup during session stop/exit.
+   - Reference: `cmd/governor/app.go:377`.
+- Implemented process-exit monitoring and room notification on unexpected agent exit.
+   - References: `cmd/governor/app.go:313`, `cmd/governor/app.go:363`, `cmd/governor/app.go:389`.
+
+These two items were high-severity at audit time and are now addressed in code.
+
 ## Findings (Ordered by Severity)
 
 ### High

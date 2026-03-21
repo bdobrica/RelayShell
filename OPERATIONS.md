@@ -193,6 +193,6 @@ Then use that HTTPS URL in Element Web advanced login.
 
 - PTY is not fully implemented yet; RelayShell currently uses raw stdio streams plus command wrapping for interactive Codex behavior.
 - `/commit` is not implemented yet.
-- `/exit` stops sessions but currently does not remove per-session workspace directories automatically.
+- Session processes are now monitored; unexpected container exits trigger a room notification and session state transition.
 - Session persistence is not implemented yet; governor restart clears in-memory session state.
 - Copilot backend is currently a stub and not functionally implemented.

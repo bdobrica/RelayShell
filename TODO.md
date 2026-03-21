@@ -8,7 +8,6 @@ Completed roadmap items were moved to `CHANGELOG.md` to keep this file focused o
 
 - [ ] Replace raw stdio pipes with true PTY integration.
 - [ ] Improve interactive CLI behavior under redraw-heavy workloads.
-- [ ] Add robust container crash detection and session-state transitions on unexpected exits.
 - [ ] Improve broken-pipe/error recovery strategy (beyond current EOF handling).
 - [ ] Add Matrix reconnect backoff and recovery strategy.
 
@@ -20,7 +19,6 @@ Completed roadmap items were moved to `CHANGELOG.md` to keep this file focused o
   - [ ] Run `git add -A` and `git commit`.
   - [ ] Return commit SHA and summary to session room.
 - [ ] Complete `/exit` cleanup path:
-  - [ ] Delete workspace directory on exit.
   - [ ] Decide and implement room archival strategy.
 
 ### Phase 4 - Git Improvements

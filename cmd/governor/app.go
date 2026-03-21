@@ -97,6 +97,7 @@ func (a *app) run(ctx context.Context) error {
 	for {
 		select {
 		case <-ctx.Done():
+			a.shutdownActiveSessions()
 			return nil
 		default:
 		}
@@ -128,6 +129,22 @@ func (a *app) run(ctx context.Context) error {
 				a.logger.Error("mark processed event failed", "event_id", event.EventID, "room_id", event.RoomID, "error", err)
 			}
 		}
+	}
+}
+
+func (a *app) shutdownActiveSessions() {
+	activeSessions := a.sessions.List()
+	if len(activeSessions) == 0 {
+		return
+	}
+
+	a.logger.Info("shutting down active sessions", "count", len(activeSessions))
+
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	for _, session := range activeSessions {
+		a.stopSession(shutdownCtx, session)
 	}
 }
 
@@ -310,6 +327,7 @@ func (a *app) startSession(ctx context.Context, ownerUserID string, cmd sessions
 	bridgeRef := bridge.New(a.logger.With("session_id", session.ID), a.matrix, session.RoomID, proc, a.cfg.BridgeBatchIdle, a.cfg.BridgeFlushMax, a.cfg.BridgeDebugIO)
 	bridgeRef.Start(ctx)
 	a.setBridge(session.RoomID, bridgeRef)
+	a.watchProcessExit(session, proc)
 
 	session.State = sessions.StateRunning
 	a.sessions.Add(session)
@@ -359,6 +377,7 @@ func (a *app) restartSession(ctx context.Context, session *sessions.Session) {
 	bridgeRef := bridge.New(a.logger.With("session_id", session.ID), a.matrix, session.RoomID, proc, a.cfg.BridgeBatchIdle, a.cfg.BridgeFlushMax, a.cfg.BridgeDebugIO)
 	bridgeRef.Start(ctx)
 	a.setBridge(session.RoomID, bridgeRef)
+	a.watchProcessExit(session, proc)
 
 	session.State = sessions.StateRunning
 	_ = a.matrix.SendText(ctx, session.RoomID, "Session restarted")
@@ -372,9 +391,47 @@ func (a *app) stopSession(ctx context.Context, session *sessions.Session) {
 		a.deleteBridge(session.RoomID)
 	}
 
+	if session.WorkspaceDir != "" {
+		if err := os.RemoveAll(session.WorkspaceDir); err != nil {
+			a.logger.Error("remove workspace failed", "session_id", session.ID, "workspace", session.WorkspaceDir, "error", err)
+			_ = a.matrix.SendText(ctx, session.RoomID, "Session stopped, but workspace cleanup failed: "+err.Error())
+		}
+	}
+
 	a.sessions.Delete(session.ID)
 	session.State = sessions.StateExited
 	_ = a.matrix.SendText(ctx, session.RoomID, "Session stopped")
+}
+
+func (a *app) watchProcessExit(session *sessions.Session, proc *container.Process) {
+	go func() {
+		err, ok := <-proc.Done()
+		if !ok {
+			return
+		}
+
+		if session.State == sessions.StateStopping || session.State == sessions.StateRestarting || session.State == sessions.StateExited {
+			return
+		}
+
+		if errors.Is(err, context.Canceled) {
+			return
+		}
+
+		a.deleteBridge(session.RoomID)
+
+		message := "Agent process exited. Use /restart to start it again."
+		if err != nil {
+			session.State = sessions.StateFailed
+			message = "Agent process exited unexpectedly: " + err.Error()
+		} else {
+			session.State = sessions.StateExited
+		}
+
+		if sendErr := a.matrix.SendText(context.Background(), session.RoomID, message); sendErr != nil {
+			a.logger.Error("send process exit notification failed", "session_id", session.ID, "room_id", session.RoomID, "error", sendErr)
+		}
+	}()
 }
 
 func (a *app) isAllowedUser(userID string) bool {
