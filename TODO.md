@@ -183,7 +183,7 @@ Core components:
 * [ ] Add SQLite/Postgres
 * [ ] Persist sessions
 * [ ] Restore sessions on restart
-* [ ] Persist processed Matrix event IDs / checkpoints to prevent duplicate command replay after governor restart
+* [x] Persist processed Matrix event IDs / checkpoints to prevent duplicate command replay after governor restart
 
 ---
 

@@ -6,6 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -28,6 +30,7 @@ type app struct {
 	runner   *container.Runner
 	agents   agents.Resolver
 	sessions *store.SessionStore
+	events   *store.ProcessedEventStore
 
 	bridgeMu sync.RWMutex
 	bridges  map[string]*bridge.Bridge
@@ -37,6 +40,15 @@ func newApp(cfg config, logger *slog.Logger) (*app, error) {
 	matrixClient, err := matrixbot.NewClient(cfg.Matrix, logger.With("component", "matrixbot"))
 	if err != nil {
 		return nil, fmt.Errorf("init matrix client: %w", err)
+	}
+
+	if err := os.MkdirAll(filepath.Dir(cfg.EventsDBPath), 0o755); err != nil {
+		return nil, fmt.Errorf("create events db directory: %w", err)
+	}
+
+	eventsStore, err := store.NewProcessedEventStore(context.Background(), cfg.EventsDBPath)
+	if err != nil {
+		return nil, fmt.Errorf("init processed event store: %w", err)
 	}
 
 	return &app{
@@ -53,13 +65,30 @@ func newApp(cfg config, logger *slog.Logger) (*app, error) {
 			CopilotCommand: cfg.CopilotCommand,
 		},
 		sessions: store.NewSessionStore(),
+		events:   eventsStore,
 		bridges:  map[string]*bridge.Bridge{},
 	}, nil
 }
 
 func (a *app) run(ctx context.Context) error {
+	defer func() {
+		if err := a.events.Close(); err != nil {
+			a.logger.Error("close processed event store", "error", err)
+		}
+	}()
+
 	if err := a.matrix.JoinRoom(ctx, a.cfg.Matrix.GovernorRoomID); err != nil {
 		return fmt.Errorf("join governor room: %w", err)
+	}
+
+	if a.cfg.EventsRetentionDays > 0 {
+		cutoff := time.Now().UTC().AddDate(0, 0, -a.cfg.EventsRetentionDays)
+		deleted, err := a.events.DeleteProcessedBefore(ctx, cutoff)
+		if err != nil {
+			a.logger.Error("cleanup processed events failed", "error", err, "retention_days", a.cfg.EventsRetentionDays)
+		} else if deleted > 0 {
+			a.logger.Info("cleaned processed events", "deleted_rows", deleted, "retention_days", a.cfg.EventsRetentionDays)
+		}
 	}
 
 	a.logger.Info("connected to governor room", "room_id", a.cfg.Matrix.GovernorRoomID)
@@ -84,7 +113,20 @@ func (a *app) run(ctx context.Context) error {
 			if event.Sender == a.matrix.UserID() {
 				continue
 			}
+
+			alreadyProcessed, err := a.events.IsProcessed(ctx, event.EventID)
+			if err != nil {
+				a.logger.Error("check processed event failed", "event_id", event.EventID, "error", err)
+				continue
+			}
+			if alreadyProcessed {
+				continue
+			}
+
 			a.handleEvent(ctx, event)
+			if err := a.events.MarkProcessed(ctx, event.EventID, event.RoomID); err != nil {
+				a.logger.Error("mark processed event failed", "event_id", event.EventID, "room_id", event.RoomID, "error", err)
+			}
 		}
 	}
 }

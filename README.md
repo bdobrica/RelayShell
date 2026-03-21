@@ -202,6 +202,8 @@ export RELAY_MATRIX_GOVERNOR_ROOM_ID="!governorRoomId:localhost"
 
 # Optional overrides
 export RELAY_WORKSPACE_BASE_DIR="/tmp/relayshell"
+export RELAY_EVENTS_DB_PATH="/tmp/relayshell/governor_events.db"
+export RELAY_EVENTS_RETENTION_DAYS="30"
 export RELAY_CONTAINER_RUNTIME="docker"
 export RELAY_CONTAINER_IMAGE="alpine:3.20"
 export RELAY_AGENT_CODEX_IMAGE="relayshell-codex:latest"

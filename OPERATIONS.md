@@ -179,3 +179,5 @@ Then use that HTTPS URL in Element Web advanced login.
 - If interactive behavior is still problematic in your environment, fallback to non-interactive mode: `while IFS= read -r line; do [ -z "$line" ] && continue; codex exec --skip-git-repo-check "$line"; done`.
 - Bridge flush timing is configurable via `RELAY_BRIDGE_OUTPUT_BATCH_IDLE_MS` (default `300`). Increase it to gather larger redraw batches, or decrease it for lower latency.
 - RelayShell sends Matrix messages with both plain `body` and HTML `formatted_body` wrapped in `<pre>` for better alignment of terminal-style output.
+- Processed Matrix message events are persisted in SQLite to avoid replay after governor restarts. Configure the DB location via `RELAY_EVENTS_DB_PATH` (default: `${RELAY_WORKSPACE_BASE_DIR}/governor_events.db`).
+- Processed event retention is configurable via `RELAY_EVENTS_RETENTION_DAYS` (default: `30`). On governor startup, rows older than this many days are deleted. Set to `0` to disable cleanup.

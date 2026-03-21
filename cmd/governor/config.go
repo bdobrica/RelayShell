@@ -11,17 +11,19 @@ import (
 )
 
 type config struct {
-	Matrix           matrixbot.Config
-	WorkspaceBaseDir string
-	ContainerRuntime string
-	ContainerImage   string
-	CodexImage       string
-	CodexCommand     string
-	CopilotImage     string
-	CopilotCommand   string
-	ContainerEnv     map[string]string
-	AllowedUsers     map[string]struct{}
-	BridgeBatchIdle  time.Duration
+	Matrix              matrixbot.Config
+	WorkspaceBaseDir    string
+	EventsDBPath        string
+	EventsRetentionDays int
+	ContainerRuntime    string
+	ContainerImage      string
+	CodexImage          string
+	CodexCommand        string
+	CopilotImage        string
+	CopilotCommand      string
+	ContainerEnv        map[string]string
+	AllowedUsers        map[string]struct{}
+	BridgeBatchIdle     time.Duration
 }
 
 func loadConfig() (config, error) {
@@ -35,6 +37,11 @@ func loadConfig() (config, error) {
 	}
 
 	workspaceBaseDir := envWithDefault("RELAY_WORKSPACE_BASE_DIR", "/tmp/relayshell")
+	eventsDBPath := envWithDefault("RELAY_EVENTS_DB_PATH", workspaceBaseDir+"/governor_events.db")
+	eventsRetentionDays, err := envNonNegativeInt("RELAY_EVENTS_RETENTION_DAYS", 30)
+	if err != nil {
+		return config{}, err
+	}
 	containerRuntime := envWithDefault("RELAY_CONTAINER_RUNTIME", "docker")
 	containerImage := envWithDefault("RELAY_CONTAINER_IMAGE", "alpine:3.20")
 	codexImage := envWithDefault("RELAY_AGENT_CODEX_IMAGE", "relayshell-codex:latest")
@@ -61,16 +68,18 @@ func loadConfig() (config, error) {
 			AccessToken:    accessToken,
 			GovernorRoomID: governorRoomID,
 		},
-		WorkspaceBaseDir: workspaceBaseDir,
-		ContainerRuntime: containerRuntime,
-		ContainerImage:   containerImage,
-		CodexImage:       codexImage,
-		CodexCommand:     codexCommand,
-		CopilotImage:     copilotImage,
-		CopilotCommand:   copilotCommand,
-		ContainerEnv:     containerEnv,
-		AllowedUsers:     allowedUsers,
-		BridgeBatchIdle:  bridgeBatchIdle,
+		WorkspaceBaseDir:    workspaceBaseDir,
+		EventsDBPath:        eventsDBPath,
+		EventsRetentionDays: eventsRetentionDays,
+		ContainerRuntime:    containerRuntime,
+		ContainerImage:      containerImage,
+		CodexImage:          codexImage,
+		CodexCommand:        codexCommand,
+		CopilotImage:        copilotImage,
+		CopilotCommand:      copilotCommand,
+		ContainerEnv:        containerEnv,
+		AllowedUsers:        allowedUsers,
+		BridgeBatchIdle:     bridgeBatchIdle,
 	}, nil
 }
 
@@ -86,6 +95,20 @@ func envDurationMS(key string, defaultMS int) (time.Duration, error) {
 	}
 
 	return time.Duration(ms) * time.Millisecond, nil
+}
+
+func envNonNegativeInt(key string, fallback int) (int, error) {
+	value := strings.TrimSpace(os.Getenv(key))
+	if value == "" {
+		return fallback, nil
+	}
+
+	parsed, err := strconv.Atoi(value)
+	if err != nil || parsed < 0 {
+		return 0, fmt.Errorf("%s must be a non-negative integer", key)
+	}
+
+	return parsed, nil
 }
 
 func envWithDefault(key, fallback string) string {
