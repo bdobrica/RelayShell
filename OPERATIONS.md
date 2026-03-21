@@ -163,6 +163,7 @@ Then use that HTTPS URL in Element Web advanced login.
 
 2. Enter the new session room.
 3. Send normal prompts; they are forwarded to Codex inside that session container.
+4. Slash commands unknown to RelayShell (for example `/model`) are passed through to the agent in session rooms.
 
 ## 8. Troubleshooting
 
@@ -176,3 +177,4 @@ Then use that HTTPS URL in Element Web advanced login.
 - If Codex panics with `tui/src/wrapping.rs` / `byte index ... out of bounds`, restart session after this fix. Governor now sets terminal size (`stty cols 120 rows 40`) before launching Codex to avoid zero-width PTY issues.
 - If interactive behavior is still problematic in your environment, fallback to non-interactive mode: `while IFS= read -r line; do [ -z "$line" ] && continue; codex exec --skip-git-repo-check "$line"; done`.
 - Bridge flush timing is configurable via `RELAY_BRIDGE_OUTPUT_BATCH_IDLE_MS` (default `300`). Increase it to gather larger redraw batches, or decrease it for lower latency.
+- RelayShell sends Matrix messages with both plain `body` and HTML `formatted_body` wrapped in `<pre>` for better alignment of terminal-style output.

@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"crypto/rand"
+	"errors"
 	"fmt"
 	"log/slog"
 	"strings"
@@ -156,6 +157,19 @@ func (a *app) handleSessionEvent(ctx context.Context, session *sessions.Session,
 	if strings.HasPrefix(text, "/") {
 		cmd, err := sessions.ParseCommand(text)
 		if err != nil {
+			if errors.Is(err, sessions.ErrUnsupportedCommand) {
+				bridgeRef, ok := a.getBridge(session.RoomID)
+				if !ok {
+					_ = a.matrix.SendText(ctx, event.RoomID, "No active container bridge for this session")
+					return
+				}
+				if err := bridgeRef.ForwardInput(text); err != nil {
+					a.logger.Error("forward slash command to container failed", "error", err)
+					_ = a.matrix.SendText(ctx, event.RoomID, "Failed to send message to agent")
+				}
+				return
+			}
+
 			_ = a.matrix.SendText(ctx, event.RoomID, "Invalid command: "+err.Error())
 			return
 		}

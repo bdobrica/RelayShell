@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"html"
 	"io"
 	"log/slog"
 	"net/http"
@@ -74,11 +75,18 @@ func (c *Client) SendText(ctx context.Context, roomID, body string) error {
 	path := fmt.Sprintf("/_matrix/client/v3/rooms/%s/send/m.room.message/%s", url.PathEscape(roomID), txnID)
 
 	payload := map[string]any{
-		"msgtype": "m.text",
-		"body":    body,
+		"msgtype":        "m.text",
+		"body":           body,
+		"format":         "org.matrix.custom.html",
+		"formatted_body": formatPreBody(body),
 	}
 
 	return c.doJSON(ctx, http.MethodPut, path, payload, nil)
+}
+
+func formatPreBody(body string) string {
+	escaped := html.EscapeString(body)
+	return "<pre>" + escaped + "</pre>"
 }
 
 func (c *Client) SetTyping(ctx context.Context, roomID string, typing bool, timeout time.Duration) error {

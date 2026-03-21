@@ -1,9 +1,12 @@
 package sessions
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 )
+
+var ErrUnsupportedCommand = errors.New("unsupported command")
 
 type CommandName string
 
@@ -68,6 +71,6 @@ func ParseCommand(input string) (Command, error) {
 
 		return Command{Name: CommandStart, Repo: repo, Branch: branch, Agent: agent}, nil
 	default:
-		return Command{}, fmt.Errorf("unsupported command %q", parts[0])
+		return Command{}, fmt.Errorf("%w %q", ErrUnsupportedCommand, parts[0])
 	}
 }
