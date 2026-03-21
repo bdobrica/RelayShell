@@ -19,6 +19,21 @@ Completed roadmap items were moved to `CHANGELOG.md` to keep this file focused o
 - [x] Support multiple sessions per repository more efficiently.
 - [x] Clean worktrees reliably on session stop/exit.
 
+### Phase 4.5 - Template-Driven Dev Containers
+
+- [ ] Build template-based worker image pipeline managed by governor.
+- [ ] Detect repository stack (Go, Python, Node.js, mixed) during session startup.
+- [ ] Add language templates with baseline dev tools:
+  - [ ] Go template: Go, Python, make.
+  - [ ] Python template: Python, build tools.
+  - [ ] Node.js template: Node.js and common build tools.
+- [ ] Python dependency bootstrap:
+  - [ ] Discover and merge multiple requirements files.
+  - [ ] Install merged dependency set in worker image/session startup.
+- [ ] Define fallback behavior when stack detection is ambiguous.
+- [ ] Add cache/rebuild policy for generated images.
+- [ ] Add safeguards for install failures and timeout handling.
+
 ### Phase 5 - Agent Backends
 
 - [ ] Implement real Copilot backend:
@@ -70,6 +85,8 @@ Completed roadmap items were moved to `CHANGELOG.md` to keep this file focused o
 ## Open Questions
 
 - [ ] Copilot auth strategy in containers.
+- [ ] Template selection precedence for mixed-language repositories.
+- [ ] Requirements merge conflict policy (pin/version conflict handling).
 - [ ] Session resumability guarantees.
 - [ ] Command parsing strictness boundaries.
 - [ ] Editable vs raw agent output policy.

@@ -276,6 +276,7 @@ Completed items are tracked in `CHANGELOG.md`.
 ### Planned
 
 * [x] Git worktree optimization and multi-session repo handling
+* [ ] Template-driven dev container builds (stack detection + language toolchains)
 * [ ] Session persistence and restore on governor restart
 * [ ] Fully functional Copilot backend
 * [ ] Security hardening (non-root containers, limits, secret handling)
