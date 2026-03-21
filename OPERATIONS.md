@@ -192,6 +192,8 @@ Then use that HTTPS URL in Element Web advanced login.
 - RelayShell sends Matrix messages with both plain `body` and HTML `formatted_body` wrapped in `<pre>` for better alignment of terminal-style output.
 - Set `RELAY_BRIDGE_DEBUG_IO=true` to emit debug logs for stdin/stdout/stderr buffers with non-printable bytes rendered as `<HEX>` markers.
 - Bridge I/O debug logs are emitted at debug level; set `RELAY_LOG_LEVEL=debug` to see them.
+- Enable `RELAY_DEV_IMAGE_TEMPLATES_ENABLED=true` to build a derived worker image per session from generated templates based on detected repository stack (`go`, `python`, `node`, `mixed`).
+- `RELAY_DEV_IMAGE_BUILD_TIMEOUT_SEC` controls derived image build timeout (default `600`). On build failure, RelayShell falls back to the base agent image.
 - Processed Matrix message events are persisted in SQLite to avoid replay after governor restarts. Configure the DB location via `RELAY_EVENTS_DB_PATH` (default: `${RELAY_WORKSPACE_BASE_DIR}/governor_events.db`).
 - Processed event retention is configurable via `RELAY_EVENTS_RETENTION_DAYS` (default: `30`). On governor startup, rows older than this many days are deleted. Set to `0` to disable cleanup.
 - RelayShell applies SQLite schema migrations automatically on governor startup using a versioned `schema_migrations` table in the same database.

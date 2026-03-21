@@ -18,6 +18,9 @@ Completed roadmap items were moved from `TODO.md` to keep the active TODO focuse
 - Implemented session room archival policy on `/exit` via `RELAY_SESSION_ROOM_ARCHIVE_POLICY` with `keep`, `leave`, and `forget` (default) modes.
 - Replaced clone-per-session workspace prep with shared bare-mirror + per-session git worktree creation.
 - Added reliable worktree cleanup on session stop/exit, including git worktree metadata pruning.
+- Added Phase 4.5 initial stack detection (`go`, `python`, `node`, `mixed`) for session workspaces.
+- Added template-driven derived worker image generation/build path (opt-in) with safe fallback to base agent image on build failures.
+- Added language-specific baseline dev tool templates for Go, Python, and Node.js stacks.
 
 ### Completed
 

@@ -29,6 +29,8 @@ type config struct {
 	BridgeFlushMax      time.Duration
 	BridgeDebugIO       bool
 	RoomArchivePolicy   roomArchivePolicy
+	DevImageTemplates   bool
+	DevImageBuildTO     time.Duration
 }
 
 type roomArchivePolicy string
@@ -85,6 +87,14 @@ func loadConfig() (config, error) {
 	if err != nil {
 		return config{}, err
 	}
+	devImageTemplates, err := envBool("RELAY_DEV_IMAGE_TEMPLATES_ENABLED", false)
+	if err != nil {
+		return config{}, err
+	}
+	devImageBuildTO, err := envDurationSeconds("RELAY_DEV_IMAGE_BUILD_TIMEOUT_SEC", 600)
+	if err != nil {
+		return config{}, err
+	}
 
 	allowedUsers := parseCSVSet(os.Getenv("RELAY_ALLOWED_USERS"))
 
@@ -112,7 +122,23 @@ func loadConfig() (config, error) {
 		BridgeFlushMax:      bridgeFlushMax,
 		BridgeDebugIO:       bridgeDebugIO,
 		RoomArchivePolicy:   archivePolicy,
+		DevImageTemplates:   devImageTemplates,
+		DevImageBuildTO:     devImageBuildTO,
 	}, nil
+}
+
+func envDurationSeconds(key string, defaultSeconds int) (time.Duration, error) {
+	value := strings.TrimSpace(os.Getenv(key))
+	if value == "" {
+		return time.Duration(defaultSeconds) * time.Second, nil
+	}
+
+	seconds, err := strconv.Atoi(value)
+	if err != nil || seconds <= 0 {
+		return 0, fmt.Errorf("%s must be a positive integer (seconds)", key)
+	}
+
+	return time.Duration(seconds) * time.Second, nil
 }
 
 func envRoomArchivePolicy(key string, fallback roomArchivePolicy) (roomArchivePolicy, error) {

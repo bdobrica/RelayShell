@@ -21,12 +21,12 @@ Completed roadmap items were moved to `CHANGELOG.md` to keep this file focused o
 
 ### Phase 4.5 - Template-Driven Dev Containers
 
-- [ ] Build template-based worker image pipeline managed by governor.
-- [ ] Detect repository stack (Go, Python, Node.js, mixed) during session startup.
-- [ ] Add language templates with baseline dev tools:
-  - [ ] Go template: Go, Python, make.
-  - [ ] Python template: Python, build tools.
-  - [ ] Node.js template: Node.js and common build tools.
+- [x] Build template-based worker image pipeline managed by governor.
+- [x] Detect repository stack (Go, Python, Node.js, mixed) during session startup.
+- [x] Add language templates with baseline dev tools:
+  - [x] Go template: Go, Python, make.
+  - [x] Python template: Python, build tools.
+  - [x] Node.js template: Node.js and common build tools.
 - [ ] Python dependency bootstrap:
   - [ ] Discover and merge multiple requirements files.
   - [ ] Install merged dependency set in worker image/session startup.

@@ -1,0 +1,72 @@
+# syntax=docker/dockerfile:1.7
+FROM {{ .BaseImage }}
+
+# Common tools for all session images.
+RUN --mount=type=cache,id=relayshell-apk-cache,target=/var/cache/apk \
+  --mount=type=cache,id=relayshell-apt-cache,target=/var/cache/apt,sharing=locked \
+  --mount=type=cache,id=relayshell-apt-lists,target=/var/lib/apt/lists,sharing=locked \
+  set -eux; \
+  if command -v apk >/dev/null 2>&1; then \
+    apk add --update-cache bash git ca-certificates; \
+  elif command -v apt-get >/dev/null 2>&1; then \
+    apt-get update; \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends bash git ca-certificates; \
+    apt-get clean; \
+  else \
+    echo 'No supported package manager found (apk/apt-get)' >&2; \
+    exit 1; \
+  fi
+
+{{ if hasLang .Languages "go" }}
+# Go stack tools.
+RUN --mount=type=cache,id=relayshell-apk-cache,target=/var/cache/apk \
+  --mount=type=cache,id=relayshell-apt-cache,target=/var/cache/apt,sharing=locked \
+  --mount=type=cache,id=relayshell-apt-lists,target=/var/lib/apt/lists,sharing=locked \
+  set -eux; \
+  if command -v apk >/dev/null 2>&1; then \
+    apk add --update-cache go python3 py3-pip make; \
+  elif command -v apt-get >/dev/null 2>&1; then \
+    apt-get update; \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends golang-go python3 python3-pip make build-essential; \
+    apt-get clean; \
+  else \
+    echo 'No supported package manager found (apk/apt-get)' >&2; \
+    exit 1; \
+  fi
+{{ end }}
+
+{{ if hasLang .Languages "python" }}
+# Python stack tools.
+RUN --mount=type=cache,id=relayshell-apk-cache,target=/var/cache/apk \
+  --mount=type=cache,id=relayshell-apt-cache,target=/var/cache/apt,sharing=locked \
+  --mount=type=cache,id=relayshell-apt-lists,target=/var/lib/apt/lists,sharing=locked \
+  set -eux; \
+  if command -v apk >/dev/null 2>&1; then \
+    apk add --update-cache python3 py3-pip build-base make; \
+  elif command -v apt-get >/dev/null 2>&1; then \
+    apt-get update; \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends python3 python3-pip build-essential make; \
+    apt-get clean; \
+  else \
+    echo 'No supported package manager found (apk/apt-get)' >&2; \
+    exit 1; \
+  fi
+{{ end }}
+
+{{ if hasLang .Languages "node" }}
+# Node.js stack tools.
+RUN --mount=type=cache,id=relayshell-apk-cache,target=/var/cache/apk \
+  --mount=type=cache,id=relayshell-apt-cache,target=/var/cache/apt,sharing=locked \
+  --mount=type=cache,id=relayshell-apt-lists,target=/var/lib/apt/lists,sharing=locked \
+  set -eux; \
+  if command -v apk >/dev/null 2>&1; then \
+    apk add --update-cache nodejs npm python3 make build-base; \
+  elif command -v apt-get >/dev/null 2>&1; then \
+    apt-get update; \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends nodejs npm python3 python3-pip make build-essential; \
+    apt-get clean; \
+  else \
+    echo 'No supported package manager found (apk/apt-get)' >&2; \
+    exit 1; \
+  fi
+{{ end }}

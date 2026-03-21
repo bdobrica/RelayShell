@@ -213,6 +213,8 @@ export RELAY_BRIDGE_OUTPUT_BATCH_IDLE_MS="300"
 export RELAY_BRIDGE_OUTPUT_FLUSH_MAX_MS="2000"
 export RELAY_BRIDGE_DEBUG_IO="false"
 export RELAY_SESSION_ROOM_ARCHIVE_POLICY="forget"
+export RELAY_DEV_IMAGE_TEMPLATES_ENABLED="false"
+export RELAY_DEV_IMAGE_BUILD_TIMEOUT_SEC="600"
 export RELAY_GIT_AUTHOR_NAME=""
 export RELAY_GIT_AUTHOR_EMAIL=""
 export RELAY_CONTAINER_PASSTHROUGH_ENV="OPENAI_API_KEY,OPENAI_BASE_URL,OPENAI_ORG_ID,OPENAI_PROJECT"
@@ -276,7 +278,8 @@ Completed items are tracked in `CHANGELOG.md`.
 ### Planned
 
 * [x] Git worktree optimization and multi-session repo handling
-* [ ] Template-driven dev container builds (stack detection + language toolchains)
+* [x] Template-driven dev container builds (initial: stack detection + baseline language toolchains)
+* [ ] Python requirements merge/install for template-driven containers
 * [ ] Session persistence and restore on governor restart
 * [ ] Fully functional Copilot backend
 * [ ] Security hardening (non-root containers, limits, secret handling)

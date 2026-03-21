@@ -26,6 +26,8 @@ type Session struct {
 	GovernorRoomID string
 	RoomID         string
 	WorkspaceDir   string
+	DetectedStack  string
+	RuntimeImage   string
 	State          State
 	CreatedAt      time.Time
 }

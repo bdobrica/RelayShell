@@ -15,6 +15,7 @@ import (
 	"github.com/bdobrica/RelayShell/internal/agents"
 	"github.com/bdobrica/RelayShell/internal/bridge"
 	"github.com/bdobrica/RelayShell/internal/container"
+	"github.com/bdobrica/RelayShell/internal/devimage"
 	"github.com/bdobrica/RelayShell/internal/gitops"
 	"github.com/bdobrica/RelayShell/internal/matrixbot"
 	"github.com/bdobrica/RelayShell/internal/sessions"
@@ -386,10 +387,29 @@ func (a *app) startSession(ctx context.Context, ownerUserID string, cmd sessions
 		return nil, err
 	}
 
+	if a.cfg.DevImageTemplates {
+		_ = a.matrix.SendText(ctx, session.GovernorRoomID, fmt.Sprintf("Building %s container...", session.Agent))
+	}
+
+	runtimeImage, detectedStack, buildAttempted, buildErr := a.resolveRuntimeImage(ctx, session, agentSpec.Image)
+	if a.cfg.DevImageTemplates {
+		switch {
+		case buildAttempted && buildErr == nil:
+			_ = a.matrix.SendText(ctx, session.GovernorRoomID, fmt.Sprintf("%s container built.", session.Agent))
+		case buildAttempted && buildErr != nil:
+			_ = a.matrix.SendText(ctx, session.GovernorRoomID, fmt.Sprintf("%s container build failed, using base image.", session.Agent))
+		default:
+			_ = a.matrix.SendText(ctx, session.GovernorRoomID, fmt.Sprintf("%s container ready (no custom build needed).", session.Agent))
+		}
+	}
+
+	session.RuntimeImage = runtimeImage
+	session.DetectedStack = string(detectedStack)
+
 	proc, err := a.runner.Start(ctx, container.StartOptions{
 		SessionID:    session.ID,
 		WorkspaceDir: session.WorkspaceDir,
-		Image:        agentSpec.Image,
+		Image:        runtimeImage,
 		Command:      agentSpec.Command,
 		Env:          a.cfg.ContainerEnv,
 	})
@@ -412,11 +432,45 @@ func (a *app) startSession(ctx context.Context, ownerUserID string, cmd sessions
 		"repo=" + session.Repo,
 		"branch=" + session.Branch,
 		"agent=" + session.Agent,
+		"stack=" + session.DetectedStack,
+		"image=" + session.RuntimeImage,
 		"workspace=" + session.WorkspaceDir,
 	}, "\n")
 	_ = a.matrix.SendText(ctx, session.RoomID, metadata)
 
 	return session, nil
+}
+
+func (a *app) resolveRuntimeImage(ctx context.Context, session *sessions.Session, baseImage string) (string, devimage.Stack, bool, error) {
+	detectedStack, err := devimage.DetectStack(session.WorkspaceDir)
+	if err != nil {
+		a.logger.Warn("stack detection failed; using base image", "session_id", session.ID, "workspace", session.WorkspaceDir, "error", err)
+		return baseImage, devimage.StackUnknown, false, err
+	}
+
+	if !a.cfg.DevImageTemplates {
+		return baseImage, detectedStack, false, nil
+	}
+
+	if detectedStack == devimage.StackUnknown {
+		return baseImage, detectedStack, false, nil
+	}
+
+	derivedImage, err := devimage.BuildDerivedImage(
+		ctx,
+		a.cfg.ContainerRuntime,
+		session.WorkspaceDir,
+		session.ID,
+		detectedStack,
+		a.cfg.DevImageBuildTO,
+	)
+	if err != nil {
+		a.logger.Warn("derived dev image build failed; falling back to base image", "session_id", session.ID, "stack", detectedStack, "error", err)
+		return baseImage, detectedStack, true, err
+	}
+
+	a.logger.Info("derived dev image built", "session_id", session.ID, "stack", detectedStack, "image", derivedImage)
+	return derivedImage, detectedStack, true, nil
 }
 
 func (a *app) restartSession(ctx context.Context, session *sessions.Session) {
@@ -434,10 +488,17 @@ func (a *app) restartSession(ctx context.Context, session *sessions.Session) {
 		return
 	}
 
+	runtimeImage := session.RuntimeImage
+	if strings.TrimSpace(runtimeImage) == "" {
+		runtimeImage, detectedStack, _, _ := a.resolveRuntimeImage(ctx, session, agentSpec.Image)
+		session.RuntimeImage = runtimeImage
+		session.DetectedStack = string(detectedStack)
+	}
+
 	proc, err := a.runner.Start(ctx, container.StartOptions{
 		SessionID:    session.ID,
 		WorkspaceDir: session.WorkspaceDir,
-		Image:        agentSpec.Image,
+		Image:        runtimeImage,
 		Command:      agentSpec.Command,
 		Env:          a.cfg.ContainerEnv,
 	})
