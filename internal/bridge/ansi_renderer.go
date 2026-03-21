@@ -229,6 +229,19 @@ func parseCSIParam(params string, defaultValue int) int {
 
 func renderBatchToLines(input string) []string {
 	s := newANSIScreen()
+	applyANSIToScreen(input, s)
+	return s.lines()
+}
+
+func renderBatchToLinesWithState(input string, s *ansiScreen) []string {
+	if s == nil {
+		s = newANSIScreen()
+	}
+	applyANSIToScreen(input, s)
+	return s.lines()
+}
+
+func applyANSIToScreen(input string, s *ansiScreen) {
 	i := 0
 	for i < len(input) {
 		ch := input[i]
@@ -273,8 +286,6 @@ func renderBatchToLines(input string) []string {
 			}
 		}
 	}
-
-	return s.lines()
 }
 
 func consumeANSIEscape(input string, s *ansiScreen) int {

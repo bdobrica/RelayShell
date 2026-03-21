@@ -79,6 +79,11 @@ func (b *Bridge) pumpOutput(ctx context.Context, reader io.Reader, prefix string
 	chunkCh := make(chan string, 32)
 	errCh := make(chan error, 1)
 	typingActive := false
+	var screen *ansiScreen
+	lastSent := ""
+	if prefix == "" {
+		screen = newANSIScreen()
+	}
 
 	go func() {
 		defer close(chunkCh)
@@ -163,7 +168,7 @@ func (b *Bridge) pumpOutput(ctx context.Context, reader io.Reader, prefix string
 		}
 
 		raw := batch.String()
-		renderedLines := renderBatchToLines(raw)
+		renderedLines := renderBatchToLinesWithState(raw, screen)
 		linesToSend := make([]string, 0, len(renderedLines))
 		for _, line := range renderedLines {
 			if strings.TrimSpace(line) == "" {
@@ -192,7 +197,13 @@ func (b *Bridge) pumpOutput(ctx context.Context, reader io.Reader, prefix string
 			}
 		}
 
-		if err := b.sender.SendText(ctx, b.roomID, strings.Join(linesToSend, "\n")); err != nil {
+		payload := strings.Join(linesToSend, "\n")
+		if payload == lastSent {
+			return nil
+		}
+		lastSent = payload
+
+		if err := b.sender.SendText(ctx, b.roomID, payload); err != nil {
 			return err
 		}
 

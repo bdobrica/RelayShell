@@ -14,6 +14,7 @@ Completed roadmap items were moved from `TODO.md` to keep the active TODO focuse
 - Added explicit broken-pipe/process-exit input recovery with deterministic session failure state and restart guidance.
 - Implemented `/commit`: stage all changes, generate fallback commit message, create commit, and report short SHA + changed files.
 - Added `/commit` author identity resolution precedence: `RELAY_GIT_AUTHOR_*` env vars, then host global git config, then RelayShell defaults.
+- Improved redraw-heavy interactive output handling by preserving ANSI screen state across bridge flushes and suppressing duplicate rendered frames.
 
 ### Completed
 

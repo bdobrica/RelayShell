@@ -6,7 +6,7 @@ Completed roadmap items were moved to `CHANGELOG.md` to keep this file focused o
 
 ### Phase 2 - PTY + Stability
 
-- [ ] Improve interactive CLI behavior under redraw-heavy workloads.
+- [x] Improve interactive CLI behavior under redraw-heavy workloads.
 
 ### Phase 3 - Session Lifecycle Commands
 
