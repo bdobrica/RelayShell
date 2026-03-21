@@ -6,7 +6,6 @@ Completed roadmap items were moved to `CHANGELOG.md` to keep this file focused o
 
 ### Phase 2 - PTY + Stability
 
-- [ ] Replace raw stdio pipes with true PTY integration.
 - [ ] Improve interactive CLI behavior under redraw-heavy workloads.
 - [ ] Improve broken-pipe/error recovery strategy (beyond current EOF handling).
 - [ ] Add Matrix reconnect backoff and recovery strategy.

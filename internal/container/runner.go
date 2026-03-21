@@ -6,12 +6,16 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"sort"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
+
+	"github.com/creack/pty/v2"
 )
 
 type Runner struct {
@@ -36,6 +40,7 @@ type Process struct {
 	stdin  io.WriteCloser
 	stdout io.ReadCloser
 	stderr io.ReadCloser
+	ptmx   *os.File
 	done   chan error
 	once   sync.Once
 }
@@ -50,6 +55,7 @@ func (r *Runner) Start(ctx context.Context, options StartOptions) (*Process, err
 		"run",
 		"--rm",
 		"-i",
+		"-t",
 		"--name",
 		"relayshell-" + options.SessionID,
 		"-v",
@@ -69,6 +75,48 @@ func (r *Runner) Start(ctx context.Context, options StartOptions) (*Process, err
 		options.Command,
 	)
 
+	proc, err := r.startWithPTY(ctx, args)
+	if err == nil {
+		return proc, nil
+	}
+
+	r.Logger.Warn("PTY startup failed, falling back to pipe mode", "error", err)
+
+	pipeArgs := make([]string, len(args))
+	copy(pipeArgs, args)
+	pipeArgs = removeArg(pipeArgs, "-t")
+
+	return r.startWithPipes(ctx, pipeArgs)
+}
+
+func (r *Runner) startWithPTY(ctx context.Context, args []string) (*Process, error) {
+	cmd := exec.CommandContext(ctx, r.Runtime, args...)
+
+	ptmx, err := pty.Start(cmd)
+	if err != nil {
+		return nil, fmt.Errorf("start PTY process: %w", err)
+	}
+
+	_ = pty.Setsize(ptmx, &pty.Winsize{Rows: 40, Cols: 120})
+
+	process := &Process{
+		cmd:    cmd,
+		stdin:  ptmx,
+		stdout: ptmx,
+		stderr: io.NopCloser(strings.NewReader("")),
+		ptmx:   ptmx,
+		done:   make(chan error, 1),
+	}
+
+	go func() {
+		process.done <- cmd.Wait()
+		close(process.done)
+	}()
+
+	return process, nil
+}
+
+func (r *Runner) startWithPipes(ctx context.Context, args []string) (*Process, error) {
 	cmd := exec.CommandContext(ctx, r.Runtime, args...)
 
 	stdin, err := cmd.StdinPipe()
@@ -102,6 +150,19 @@ func (r *Runner) Start(ctx context.Context, options StartOptions) (*Process, err
 	}()
 
 	return process, nil
+}
+
+func removeArg(args []string, target string) []string {
+	result := make([]string, 0, len(args))
+	removed := false
+	for _, arg := range args {
+		if !removed && arg == target {
+			removed = true
+			continue
+		}
+		result = append(result, arg)
+	}
+	return result
 }
 
 func sortedEnvFlags(values map[string]string) []string {
@@ -157,6 +218,10 @@ func (p *Process) Done() <-chan error {
 func (p *Process) Stop() error {
 	var stopErr error
 	p.once.Do(func() {
+		if p.ptmx != nil {
+			defer p.ptmx.Close()
+		}
+
 		if p.cmd == nil || p.cmd.Process == nil {
 			return
 		}

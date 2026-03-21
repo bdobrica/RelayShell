@@ -197,8 +197,7 @@ func normalizeCodexCommand(value string) string {
 			inner = "--no-alt-screen"
 		}
 		codexCommand := "codex " + inner
-		wrapped := "stty cols 120 rows 40 >/dev/null 2>&1 || true; " + codexCommand
-		return fmt.Sprintf("printenv OPENAI_API_KEY | codex login --with-api-key >/dev/null 2>&1 || true; script -q -e -c %q /dev/null", wrapped)
+		return fmt.Sprintf("printenv OPENAI_API_KEY | codex login --with-api-key >/dev/null 2>&1 || true; %s", codexCommand)
 	}
 	return trimmed
 }

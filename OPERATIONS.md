@@ -173,11 +173,10 @@ Then use that HTTPS URL in Element Web advanced login.
 - If governor fails with missing env vars: verify `.env` exists and required fields are set.
 - If codex fails to authenticate: verify `OPENAI_API_KEY` in `.env` and ensure it is listed in `RELAY_CONTAINER_PASSTHROUGH_ENV`.
 - If Matrix login/join fails: inspect homeserver logs with `make tuwunel-logs`.
-- Interactive bridge default: set `RELAY_AGENT_CODEX_COMMAND=codex` and governor will auto-normalize to:
+- Interactive bridge uses PTY by default. Set `RELAY_AGENT_CODEX_COMMAND=codex` and governor auto-normalizes to:
   1. `codex login --with-api-key` using `OPENAI_API_KEY`
-  2. `script -q -e -c 'codex --no-alt-screen' /dev/null`
-- If you see `the input device is not a TTY`, ensure worker containers are not started with `docker run -t` from the host process; use the wrapped command above and restart governor.
-- If Codex panics with `tui/src/wrapping.rs` / `byte index ... out of bounds`, restart session after this fix. Governor now sets terminal size (`stty cols 120 rows 40`) before launching Codex to avoid zero-width PTY issues.
+  2. `codex --no-alt-screen`
+- If PTY startup fails in your environment, governor falls back to pipe mode and logs a warning.
 - If interactive behavior is still problematic in your environment, fallback to non-interactive mode: `while IFS= read -r line; do [ -z "$line" ] && continue; codex exec --skip-git-repo-check "$line"; done`.
 - Bridge flush timing is configurable via `RELAY_BRIDGE_OUTPUT_BATCH_IDLE_MS` (default `300`). Increase it to gather larger redraw batches, or decrease it for lower latency.
 - Bridge output uses idle-time debounce flush: each new output chunk resets the timer, and buffered output is sent only after `RELAY_BRIDGE_OUTPUT_BATCH_IDLE_MS` of inactivity.
@@ -191,7 +190,7 @@ Then use that HTTPS URL in Element Web advanced login.
 
 ## 9. Current Limitations
 
-- PTY is not fully implemented yet; RelayShell currently uses raw stdio streams plus command wrapping for interactive Codex behavior.
+- PTY is implemented with a pipe-mode fallback if PTY allocation fails in a given runtime environment.
 - `/commit` is not implemented yet.
 - Session processes are now monitored; unexpected container exits trigger a room notification and session state transition.
 - Session persistence is not implemented yet; governor restart clears in-memory session state.

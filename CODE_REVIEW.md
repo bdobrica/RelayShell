@@ -9,8 +9,12 @@ Scope: Current main branch implementation audited against TODO.md roadmap and ru
    - Reference: `cmd/governor/app.go:377`.
 - Implemented process-exit monitoring and room notification on unexpected agent exit.
    - References: `cmd/governor/app.go:313`, `cmd/governor/app.go:363`, `cmd/governor/app.go:389`.
+- Implemented PTY-first container runtime with pipe-mode fallback.
+   - References: `internal/container/runner.go:54`, `internal/container/runner.go:78`, `internal/container/runner.go:92`.
+- Simplified default Codex command normalization for PTY runtime (removed script/stty dependency).
+   - Reference: `cmd/governor/config.go:190`.
 
-These two items were high-severity at audit time and are now addressed in code.
+These previously high/medium items are now addressed in code.
 
 ## Findings (Ordered by Severity)
 
