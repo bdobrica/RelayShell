@@ -17,6 +17,8 @@ Scope: Current main branch implementation audited against TODO.md roadmap and ru
    - Reference: `cmd/governor/app.go:97`.
 - Implemented explicit broken-pipe/process-exit input recovery with session failure transition and `/restart` guidance.
    - References: `internal/container/runner.go:198`, `cmd/governor/app.go:288`.
+- Implemented `/commit` lifecycle command end-to-end in session rooms.
+   - References: `cmd/governor/app.go:255`, `cmd/governor/app.go:303`, `internal/gitops/workspace.go:42`.
 
 These previously high/medium items are now addressed in code.
 

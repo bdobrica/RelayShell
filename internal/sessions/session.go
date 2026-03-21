@@ -10,6 +10,7 @@ const (
 	StateCreatingRoom       State = "creating_room"
 	StateStartingContainer  State = "starting_container"
 	StateRunning            State = "running"
+	StateCommitting         State = "committing"
 	StateRestarting         State = "restarting"
 	StateStopping           State = "stopping"
 	StateExited             State = "exited"

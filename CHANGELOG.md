@@ -12,6 +12,7 @@ Completed roadmap items were moved from `TODO.md` to keep the active TODO focuse
 - Updated Codex command normalization for PTY runtime (direct `codex --no-alt-screen` after login step).
 - Added exponential Matrix sync retry backoff (capped) with delay reset after successful recovery.
 - Added explicit broken-pipe/process-exit input recovery with deterministic session failure state and restart guidance.
+- Implemented `/commit`: stage all changes, generate fallback commit message, create commit, and report short SHA + changed files.
 
 ### Completed
 

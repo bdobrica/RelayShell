@@ -100,7 +100,7 @@ These go directly to the agent.
 
 ```text
 /restart   # restart agent session
-/commit    # planned (currently not implemented)
+/commit    # create a git commit from workspace changes
 /exit      # stop session
 /status    # show session state
 ```
@@ -116,6 +116,7 @@ Each session goes through:
 * `creating_room`
 * `starting_container`
 * `running`
+* `committing`
 * `restarting`
 * `stopping`
 * `exited`
@@ -211,6 +212,8 @@ export RELAY_AGENT_CODEX_COMMAND="codex"
 export RELAY_BRIDGE_OUTPUT_BATCH_IDLE_MS="300"
 export RELAY_BRIDGE_OUTPUT_FLUSH_MAX_MS="2000"
 export RELAY_BRIDGE_DEBUG_IO="false"
+export RELAY_GIT_AUTHOR_NAME=""
+export RELAY_GIT_AUTHOR_EMAIL=""
 export RELAY_CONTAINER_PASSTHROUGH_ENV="OPENAI_API_KEY,OPENAI_BASE_URL,OPENAI_ORG_ID,OPENAI_PROJECT"
 export RELAY_ALLOWED_USERS="@yourUser:localhost"
 
@@ -262,7 +265,6 @@ Completed items are tracked in `CHANGELOG.md`.
 ### In Progress
 
 * [ ] Interactive behavior tuning for redraw-heavy workloads
-* [ ] `/commit` implementation
 * [ ] Session stop/exit room archival policy
 
 ### Planned

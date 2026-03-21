@@ -165,8 +165,12 @@ Then use that HTTPS URL in Element Web advanced login.
 3. Send normal prompts; they are forwarded to Codex inside that session container.
 4. Slash commands unknown to RelayShell (for example `/model`) are passed through to the agent in session rooms.
 5. Each forwarded message is submitted with Enter automatically. Use `/enter` to send Enter by itself (for prompts like "Press enter to continue").
-6. Session commands currently available in session rooms: `/status`, `/restart`, `/exit`, `/enter`.
-7. `/commit` is parsed but not implemented yet.
+6. Session commands currently available in session rooms: `/status`, `/restart`, `/commit`, `/exit`, `/enter`.
+7. `/commit` stages all workspace changes (`git add -A`), creates a commit with an automatic fallback message, and returns commit SHA.
+8. Commit author identity precedence:
+  1. `RELAY_GIT_AUTHOR_NAME` / `RELAY_GIT_AUTHOR_EMAIL` (if set)
+  2. host global git config (`git config --global user.name`, `git config --global user.email`)
+  3. fallback defaults (`RelayShell`, `relayshell@local`)
 
 ## 8. Troubleshooting
 
@@ -191,7 +195,6 @@ Then use that HTTPS URL in Element Web advanced login.
 ## 9. Current Limitations
 
 - PTY is implemented with a pipe-mode fallback if PTY allocation fails in a given runtime environment.
-- `/commit` is not implemented yet.
 - Session processes are now monitored; unexpected container exits trigger a room notification and session state transition.
 - Session persistence is not implemented yet; governor restart clears in-memory session state.
 - Copilot backend is currently a stub and not functionally implemented.

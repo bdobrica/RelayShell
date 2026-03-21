@@ -55,7 +55,7 @@ func newApp(cfg config, logger *slog.Logger) (*app, error) {
 		cfg:    cfg,
 		logger: logger,
 		matrix: matrixClient,
-		git:    gitops.NewManager(cfg.WorkspaceBaseDir),
+		git:    gitops.NewManager(cfg.WorkspaceBaseDir, cfg.GitAuthorName, cfg.GitAuthorEmail),
 		runner: container.NewRunner(cfg.ContainerRuntime, logger.With("component", "container")),
 		agents: agents.Resolver{
 			DefaultImage:   cfg.ContainerImage,
@@ -253,7 +253,7 @@ func (a *app) handleSessionEvent(ctx context.Context, session *sessions.Session,
 		case sessions.CommandStatus:
 			_ = a.matrix.SendText(ctx, event.RoomID, fmt.Sprintf("Session %s is %s", session.ID, session.State))
 		case sessions.CommandCommit:
-			_ = a.matrix.SendText(ctx, event.RoomID, "/commit is parsed but implemented in Phase 3")
+			a.commitSession(ctx, session)
 		case sessions.CommandEnter:
 			bridgeRef, ok := a.getBridge(session.RoomID)
 			if !ok {
@@ -298,6 +298,50 @@ func (a *app) handleBridgeInputError(ctx context.Context, session *sessions.Sess
 	}
 
 	_ = a.matrix.SendText(ctx, roomID, "Failed to send message to agent")
+}
+
+func (a *app) commitSession(ctx context.Context, session *sessions.Session) {
+	if strings.TrimSpace(session.WorkspaceDir) == "" {
+		_ = a.matrix.SendText(ctx, session.RoomID, "No workspace available for commit")
+		return
+	}
+
+	previousState := session.State
+	session.State = sessions.StateCommitting
+
+	result, err := a.git.CommitAll(ctx, session.WorkspaceDir)
+	if err != nil {
+		session.State = previousState
+		if errors.Is(err, gitops.ErrNoChanges) {
+			_ = a.matrix.SendText(ctx, session.RoomID, "No changes to commit")
+			return
+		}
+
+		a.logger.Error("commit session failed", "session_id", session.ID, "workspace", session.WorkspaceDir, "error", err)
+		_ = a.matrix.SendText(ctx, session.RoomID, "Commit failed: "+err.Error())
+		return
+	}
+
+	session.State = previousState
+
+	summary := []string{
+		"Commit created",
+		"sha=" + result.SHA,
+		"message=" + result.Message,
+		fmt.Sprintf("files=%d", len(result.Files)),
+	}
+	if len(result.Files) > 0 {
+		limit := len(result.Files)
+		if limit > 8 {
+			limit = 8
+		}
+		summary = append(summary, "changed="+strings.Join(result.Files[:limit], ", "))
+		if len(result.Files) > limit {
+			summary = append(summary, fmt.Sprintf("and %d more file(s)", len(result.Files)-limit))
+		}
+	}
+
+	_ = a.matrix.SendText(ctx, session.RoomID, strings.Join(summary, "\n"))
 }
 
 func (a *app) startSession(ctx context.Context, ownerUserID string, cmd sessions.Command) (*sessions.Session, error) {

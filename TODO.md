@@ -10,11 +10,6 @@ Completed roadmap items were moved to `CHANGELOG.md` to keep this file focused o
 
 ### Phase 3 - Session Lifecycle Commands
 
-- [ ] Implement `/commit` end-to-end:
-  - [ ] Generate git diff summary.
-  - [ ] Generate commit message (agent-assisted or fallback).
-  - [ ] Run `git add -A` and `git commit`.
-  - [ ] Return commit SHA and summary to session room.
 - [ ] Complete `/exit` cleanup path:
   - [ ] Decide and implement room archival strategy.
 

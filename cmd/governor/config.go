@@ -22,6 +22,8 @@ type config struct {
 	CopilotImage        string
 	CopilotCommand      string
 	ContainerEnv        map[string]string
+	GitAuthorName       string
+	GitAuthorEmail      string
 	AllowedUsers        map[string]struct{}
 	BridgeBatchIdle     time.Duration
 	BridgeFlushMax      time.Duration
@@ -50,6 +52,8 @@ func loadConfig() (config, error) {
 	codexCommand := normalizeCodexCommand(envWithDefault("RELAY_AGENT_CODEX_COMMAND", "codex"))
 	copilotImage := envWithDefault("RELAY_AGENT_COPILOT_IMAGE", containerImage)
 	copilotCommand := envWithDefault("RELAY_AGENT_COPILOT_COMMAND", "cat")
+	gitAuthorName := strings.TrimSpace(os.Getenv("RELAY_GIT_AUTHOR_NAME"))
+	gitAuthorEmail := strings.TrimSpace(os.Getenv("RELAY_GIT_AUTHOR_EMAIL"))
 
 	passthroughEnv := parseCSVList(envWithDefault(
 		"RELAY_CONTAINER_PASSTHROUGH_ENV",
@@ -88,6 +92,8 @@ func loadConfig() (config, error) {
 		CopilotImage:        copilotImage,
 		CopilotCommand:      copilotCommand,
 		ContainerEnv:        containerEnv,
+		GitAuthorName:       gitAuthorName,
+		GitAuthorEmail:      gitAuthorEmail,
 		AllowedUsers:        allowedUsers,
 		BridgeBatchIdle:     bridgeBatchIdle,
 		BridgeFlushMax:      bridgeFlushMax,
