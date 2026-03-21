@@ -167,7 +167,11 @@ Then use that HTTPS URL in Element Web advanced login.
 5. Each forwarded message is submitted with Enter automatically. Use `/enter` to send Enter by itself (for prompts like "Press enter to continue").
 6. Session commands currently available in session rooms: `/status`, `/restart`, `/commit`, `/exit`, `/enter`.
 7. `/commit` stages all workspace changes (`git add -A`), creates a commit with an automatic fallback message, and returns commit SHA.
-8. Commit author identity precedence:
+8. `/exit` applies session room archival policy via `RELAY_SESSION_ROOM_ARCHIVE_POLICY`:
+  1. `keep` keeps the bot joined in the session room.
+  2. `leave` (default) makes the bot leave the session room.
+  3. `forget` makes the bot leave and then forget the room.
+9. Commit author identity precedence:
   1. `RELAY_GIT_AUTHOR_NAME` / `RELAY_GIT_AUTHOR_EMAIL` (if set)
   2. host global git config (`git config --global user.name`, `git config --global user.email`)
   3. fallback defaults (`RelayShell`, `relayshell@local`)

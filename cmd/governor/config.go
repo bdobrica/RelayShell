@@ -28,7 +28,16 @@ type config struct {
 	BridgeBatchIdle     time.Duration
 	BridgeFlushMax      time.Duration
 	BridgeDebugIO       bool
+	RoomArchivePolicy   roomArchivePolicy
 }
+
+type roomArchivePolicy string
+
+const (
+	roomArchiveKeep   roomArchivePolicy = "keep"
+	roomArchiveLeave  roomArchivePolicy = "leave"
+	roomArchiveForget roomArchivePolicy = "forget"
+)
 
 func loadConfig() (config, error) {
 	homeserver := strings.TrimSpace(os.Getenv("RELAY_MATRIX_HOMESERVER"))
@@ -72,6 +81,10 @@ func loadConfig() (config, error) {
 	if err != nil {
 		return config{}, err
 	}
+	archivePolicy, err := envRoomArchivePolicy("RELAY_SESSION_ROOM_ARCHIVE_POLICY", roomArchiveLeave)
+	if err != nil {
+		return config{}, err
+	}
 
 	allowedUsers := parseCSVSet(os.Getenv("RELAY_ALLOWED_USERS"))
 
@@ -98,7 +111,22 @@ func loadConfig() (config, error) {
 		BridgeBatchIdle:     bridgeBatchIdle,
 		BridgeFlushMax:      bridgeFlushMax,
 		BridgeDebugIO:       bridgeDebugIO,
+		RoomArchivePolicy:   archivePolicy,
 	}, nil
+}
+
+func envRoomArchivePolicy(key string, fallback roomArchivePolicy) (roomArchivePolicy, error) {
+	value := strings.ToLower(strings.TrimSpace(os.Getenv(key)))
+	if value == "" {
+		return fallback, nil
+	}
+
+	switch roomArchivePolicy(value) {
+	case roomArchiveKeep, roomArchiveLeave, roomArchiveForget:
+		return roomArchivePolicy(value), nil
+	default:
+		return "", fmt.Errorf("%s must be one of: keep, leave, forget", key)
+	}
 }
 
 func envDurationMS(key string, defaultMS int) (time.Duration, error) {

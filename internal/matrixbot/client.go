@@ -70,6 +70,16 @@ func (c *Client) JoinRoom(ctx context.Context, roomID string) error {
 	return c.doJSON(ctx, http.MethodPost, path, map[string]any{}, nil)
 }
 
+func (c *Client) LeaveRoom(ctx context.Context, roomID string) error {
+	path := fmt.Sprintf("/_matrix/client/v3/rooms/%s/leave", url.PathEscape(roomID))
+	return c.doJSON(ctx, http.MethodPost, path, map[string]any{}, nil)
+}
+
+func (c *Client) ForgetRoom(ctx context.Context, roomID string) error {
+	path := fmt.Sprintf("/_matrix/client/v3/rooms/%s/forget", url.PathEscape(roomID))
+	return c.doJSON(ctx, http.MethodPost, path, map[string]any{}, nil)
+}
+
 func (c *Client) SendText(ctx context.Context, roomID, body string) error {
 	txnID := strconv.FormatInt(time.Now().UnixNano(), 10)
 	path := fmt.Sprintf("/_matrix/client/v3/rooms/%s/send/m.room.message/%s", url.PathEscape(roomID), txnID)

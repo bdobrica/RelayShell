@@ -10,8 +10,8 @@ Completed roadmap items were moved to `CHANGELOG.md` to keep this file focused o
 
 ### Phase 3 - Session Lifecycle Commands
 
-- [ ] Complete `/exit` cleanup path:
-  - [ ] Decide and implement room archival strategy.
+- [x] Complete `/exit` cleanup path:
+  - [x] Decide and implement room archival strategy.
 
 ### Phase 4 - Git Improvements
 

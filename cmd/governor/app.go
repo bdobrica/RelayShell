@@ -475,6 +475,36 @@ func (a *app) stopSession(ctx context.Context, session *sessions.Session) {
 	a.sessions.Delete(session.ID)
 	session.State = sessions.StateExited
 	_ = a.matrix.SendText(ctx, session.RoomID, "Session stopped")
+
+	a.applyRoomArchivePolicy(session)
+}
+
+func (a *app) applyRoomArchivePolicy(session *sessions.Session) {
+	if strings.TrimSpace(session.RoomID) == "" {
+		return
+	}
+
+	archiveCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	switch a.cfg.RoomArchivePolicy {
+	case roomArchiveKeep:
+		return
+	case roomArchiveLeave:
+		if err := a.matrix.LeaveRoom(archiveCtx, session.RoomID); err != nil {
+			a.logger.Error("leave session room failed", "session_id", session.ID, "room_id", session.RoomID, "error", err)
+		}
+	case roomArchiveForget:
+		if err := a.matrix.LeaveRoom(archiveCtx, session.RoomID); err != nil {
+			a.logger.Error("leave session room before forget failed", "session_id", session.ID, "room_id", session.RoomID, "error", err)
+			return
+		}
+		if err := a.matrix.ForgetRoom(archiveCtx, session.RoomID); err != nil {
+			a.logger.Error("forget session room failed", "session_id", session.ID, "room_id", session.RoomID, "error", err)
+		}
+	default:
+		a.logger.Error("unknown room archive policy", "policy", a.cfg.RoomArchivePolicy)
+	}
 }
 
 func (a *app) watchProcessExit(session *sessions.Session, proc *container.Process) {

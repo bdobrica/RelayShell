@@ -1,5 +1,4 @@
 package bridge
-package bridge
 
 import (
 	"reflect"
