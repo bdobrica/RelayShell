@@ -27,10 +27,7 @@ func BuildDerivedImage(ctx context.Context, runtime, workspaceDir, sessionID str
 	}
 
 	dockerfilePath := filepath.Join(dir, "Dockerfile.dev")
-	content, err := RenderDockerfile(stack)
-	if err != nil {
-		return "", err
-	}
+	content := RenderDockerfile()
 	if err := os.WriteFile(dockerfilePath, []byte(content), 0o644); err != nil {
 		return "", fmt.Errorf("write generated Dockerfile: %w", err)
 	}
@@ -43,7 +40,11 @@ func BuildDerivedImage(ctx context.Context, runtime, workspaceDir, sessionID str
 	}
 	defer cancel()
 
-	cmd := exec.CommandContext(buildCtx, runtime, "build", "-f", dockerfilePath, "-t", tag, workspaceDir)
+	buildArgs := []string{"build", "-f", dockerfilePath, "-t", tag}
+	buildArgs = append(buildArgs, buildArgsForStack(stack)...)
+	buildArgs = append(buildArgs, workspaceDir)
+
+	cmd := exec.CommandContext(buildCtx, runtime, buildArgs...)
 	cmd.Env = append(os.Environ(), "DOCKER_BUILDKIT=1")
 	output, err := cmd.CombinedOutput()
 	if err != nil {

@@ -1,12 +1,7 @@
 package devimage
 
 import (
-	"bytes"
 	_ "embed"
-	"fmt"
-	"slices"
-	"strings"
-	"text/template"
 )
 
 //go:embed templates/Dockerfile.dev.tmpl
@@ -14,47 +9,44 @@ var dockerfileTemplateSource string
 
 const defaultDerivedBaseImage = "relayshell-codex:latest"
 
-var dockerfileTemplate = template.Must(template.New("Dockerfile.dev.tmpl").Funcs(template.FuncMap{
-	"hasLang": hasLanguage,
-}).Parse(dockerfileTemplateSource))
-
-type dockerfileTemplateData struct {
-	BaseImage string
-	Languages []string
+func RenderDockerfile() string {
+	return dockerfileTemplateSource
 }
 
-func RenderDockerfile(stack Stack) (string, error) {
-	languages := languagesForStack(stack)
-	data := dockerfileTemplateData{
-		BaseImage: defaultDerivedBaseImage,
-		Languages: languages,
+func buildArgsForStack(stack Stack) []string {
+	args := []string{
+		"--build-arg", "BASE_IMAGE=" + defaultDerivedBaseImage,
+		"--build-arg", "ENABLE_GO=0",
+		"--build-arg", "ENABLE_PYTHON=0",
+		"--build-arg", "ENABLE_NODEJS=0",
 	}
 
-	var out bytes.Buffer
-	if err := dockerfileTemplate.Execute(&out, data); err != nil {
-		return "", fmt.Errorf("render dockerfile template: %w", err)
-	}
-
-	return out.String(), nil
-}
-
-func languagesForStack(stack Stack) []string {
 	switch stack {
 	case StackGo:
-		return []string{"go"}
+		args = enableBuildArg(args, "ENABLE_GO")
 	case StackPython:
-		return []string{"python"}
+		args = enableBuildArg(args, "ENABLE_PYTHON")
 	case StackNode:
-		return []string{"node"}
+		args = enableBuildArg(args, "ENABLE_NODEJS")
 	case StackMixed:
-		return []string{"go", "python", "node"}
+		args = enableBuildArg(args, "ENABLE_GO")
+		args = enableBuildArg(args, "ENABLE_PYTHON")
+		args = enableBuildArg(args, "ENABLE_NODEJS")
 	case StackUnknown:
 		fallthrough
 	default:
-		return nil
+		return args
 	}
+
+	return args
 }
 
-func hasLanguage(languages []string, language string) bool {
-	return slices.Contains(languages, strings.ToLower(strings.TrimSpace(language)))
+func enableBuildArg(args []string, name string) []string {
+	for i := 0; i < len(args)-1; i += 2 {
+		if args[i] == "--build-arg" && args[i+1] == name+"=0" {
+			args[i+1] = name + "=1"
+			return args
+		}
+	}
+	return append(args, "--build-arg", name+"=1")
 }
