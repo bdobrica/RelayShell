@@ -262,7 +262,6 @@ Completed items are tracked in `CHANGELOG.md`.
 ### In Progress
 
 * [ ] Interactive behavior tuning for redraw-heavy workloads
-* [ ] Matrix reconnect backoff/recovery strategy
 * [ ] `/commit` implementation
 * [ ] Session stop/exit room archival policy
 

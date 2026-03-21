@@ -8,7 +8,6 @@ Completed roadmap items were moved to `CHANGELOG.md` to keep this file focused o
 
 - [ ] Improve interactive CLI behavior under redraw-heavy workloads.
 - [ ] Improve broken-pipe/error recovery strategy (beyond current EOF handling).
-- [ ] Add Matrix reconnect backoff and recovery strategy.
 
 ### Phase 3 - Session Lifecycle Commands
 

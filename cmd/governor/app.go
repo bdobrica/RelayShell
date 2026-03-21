@@ -94,6 +94,8 @@ func (a *app) run(ctx context.Context) error {
 	a.logger.Info("connected to governor room", "room_id", a.cfg.Matrix.GovernorRoomID)
 
 	since := ""
+	retryDelay := time.Second
+	const maxRetryDelay = 30 * time.Second
 	for {
 		select {
 		case <-ctx.Done():
@@ -104,9 +106,24 @@ func (a *app) run(ctx context.Context) error {
 
 		nextBatch, events, err := a.matrix.SyncOnce(ctx, since, 30*time.Second)
 		if err != nil {
-			a.logger.Error("matrix sync failed", "error", err)
-			time.Sleep(2 * time.Second)
+			a.logger.Error("matrix sync failed", "error", err, "retry_in", retryDelay)
+			select {
+			case <-ctx.Done():
+				a.shutdownActiveSessions()
+				return nil
+			case <-time.After(retryDelay):
+			}
+
+			retryDelay *= 2
+			if retryDelay > maxRetryDelay {
+				retryDelay = maxRetryDelay
+			}
 			continue
+		}
+
+		if retryDelay != time.Second {
+			a.logger.Info("matrix sync recovered", "retry_delay_reset", true)
+			retryDelay = time.Second
 		}
 		since = nextBatch
 

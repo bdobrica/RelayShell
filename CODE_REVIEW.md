@@ -13,6 +13,8 @@ Scope: Current main branch implementation audited against TODO.md roadmap and ru
    - References: `internal/container/runner.go:54`, `internal/container/runner.go:78`, `internal/container/runner.go:92`.
 - Simplified default Codex command normalization for PTY runtime (removed script/stty dependency).
    - Reference: `cmd/governor/config.go:190`.
+- Implemented exponential Matrix sync retry backoff with recovery reset.
+   - Reference: `cmd/governor/app.go:97`.
 
 These previously high/medium items are now addressed in code.
 
