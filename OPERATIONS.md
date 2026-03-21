@@ -18,6 +18,11 @@ cp .env.example .env
 ```bash
 make build-codex-image
 ```
+3a. Build Copilot image (if you plan to use `agent=copilot`):
+
+```bash
+make build-copilot-image
+```
 
 4. Start tuwunel:
 
@@ -43,6 +48,7 @@ make governor-run
 - `make tuwunel-down`: stops and removes compose services.
 - `make tuwunel-logs`: tails tuwunel logs.
 - `make build-codex-image`: builds `relayshell-codex:latest` from `Dockerfile.codex`.
+- `make build-copilot-image`: builds `relayshell-copilot:latest` from `Dockerfile.copilot`.
 - `make matrix-bootstrap`: registers/logs in bot and human users, creates governor room, invites bot, and writes values into `.env`.
 - `make governor-run`: loads variables from `.env` and runs governor.
 - `make dev-run`: starts tuwunel, builds codex image, bootstraps matrix users/room, then runs governor in one command.
@@ -184,7 +190,9 @@ Then use that HTTPS URL in Element Web advanced login.
 - Interactive bridge uses PTY by default. Set `RELAY_AGENT_CODEX_COMMAND=codex` and governor auto-normalizes to:
   1. `codex login --with-api-key` using `OPENAI_API_KEY`
   2. `codex --no-alt-screen`
+- Copilot backend uses `RELAY_AGENT_COPILOT_COMMAND` (default `copilot`) and attempts non-interactive token bootstrap when `GH_TOKEN` or `GITHUB_TOKEN` is passed through (`copilot auth login --with-token`).
 - If PTY startup fails in your environment, governor falls back to pipe mode and logs a warning.
+ 
 - If interactive behavior is still problematic in your environment, fallback to non-interactive mode: `while IFS= read -r line; do [ -z "$line" ] && continue; codex exec --skip-git-repo-check "$line"; done`.
 - Bridge flush timing is configurable via `RELAY_BRIDGE_OUTPUT_BATCH_IDLE_MS` (default `300`). Increase it to gather larger redraw batches, or decrease it for lower latency.
 - Bridge output uses idle-time debounce flush: each new output chunk resets the timer, and buffered output is sent only after `RELAY_BRIDGE_OUTPUT_BATCH_IDLE_MS` of inactivity.

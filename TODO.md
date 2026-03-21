@@ -37,11 +37,11 @@ Completed roadmap items were moved to `CHANGELOG.md` to keep this file focused o
 
 ### Phase 5 - Agent Backends
 
-- [ ] Implement real Copilot backend:
-  - [ ] Container image.
-  - [ ] CLI setup.
-  - [ ] Auth handling.
-- [ ] Define and adopt an explicit AgentBackend interface for all backends.
+- [x] Implement real Copilot backend:
+  - [x] Container image.
+  - [x] CLI setup.
+  - [x] Auth handling.
+- [x] Define and adopt an explicit AgentBackend interface for all backends.
 
 ### Phase 6 - Persistence
 
@@ -85,7 +85,6 @@ Completed roadmap items were moved to `CHANGELOG.md` to keep this file focused o
 
 ## Open Questions
 
-- [ ] Copilot auth strategy in containers.
 - [ ] Template selection precedence for mixed-language repositories.
 - [ ] Requirements merge conflict policy (pin/version conflict handling).
 - [ ] Session resumability guarantees.

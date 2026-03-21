@@ -61,14 +61,14 @@ func loadConfig() (config, error) {
 	containerImage := envWithDefault("RELAY_CONTAINER_IMAGE", "alpine:3.20")
 	codexImage := envWithDefault("RELAY_AGENT_CODEX_IMAGE", "relayshell-codex:latest")
 	codexCommand := normalizeCodexCommand(envWithDefault("RELAY_AGENT_CODEX_COMMAND", "codex"))
-	copilotImage := envWithDefault("RELAY_AGENT_COPILOT_IMAGE", containerImage)
-	copilotCommand := envWithDefault("RELAY_AGENT_COPILOT_COMMAND", "cat")
+	copilotImage := envWithDefault("RELAY_AGENT_COPILOT_IMAGE", "relayshell-copilot:latest")
+	copilotCommand := normalizeCopilotCommand(envWithDefault("RELAY_AGENT_COPILOT_COMMAND", "copilot"))
 	gitAuthorName := strings.TrimSpace(os.Getenv("RELAY_GIT_AUTHOR_NAME"))
 	gitAuthorEmail := strings.TrimSpace(os.Getenv("RELAY_GIT_AUTHOR_EMAIL"))
 
 	passthroughEnv := parseCSVList(envWithDefault(
 		"RELAY_CONTAINER_PASSTHROUGH_ENV",
-		"OPENAI_API_KEY,OPENAI_BASE_URL,OPENAI_ORG_ID,OPENAI_PROJECT",
+		"OPENAI_API_KEY,OPENAI_BASE_URL,OPENAI_ORG_ID,OPENAI_PROJECT,GH_TOKEN,GITHUB_TOKEN",
 	))
 	containerEnv := collectProcessEnv(passthroughEnv)
 	bridgeBatchIdle, err := envDurationMS("RELAY_BRIDGE_OUTPUT_BATCH_IDLE_MS", 300)
@@ -259,5 +259,25 @@ func normalizeCodexCommand(value string) string {
 		codexCommand := "codex " + inner
 		return fmt.Sprintf("printenv OPENAI_API_KEY | codex login --with-api-key >/dev/null 2>&1 || true; %s", codexCommand)
 	}
+	return trimmed
+}
+
+func normalizeCopilotCommand(value string) string {
+	trimmed := strings.TrimSpace(value)
+	if trimmed == "" || trimmed == "copilot" || strings.HasPrefix(trimmed, "copilot ") {
+		inner := strings.TrimSpace(strings.TrimPrefix(trimmed, "copilot"))
+		copilotCommand := "copilot"
+		if inner != "" {
+			copilotCommand += " " + inner
+		}
+
+		// Prefer GH_TOKEN but accept GITHUB_TOKEN as an alias when provided by host env.
+		return strings.Join([]string{
+			`if [ -z "${GH_TOKEN:-}" ] && [ -n "${GITHUB_TOKEN:-}" ]; then export GH_TOKEN="${GITHUB_TOKEN}"; fi`,
+			`if [ -n "${GH_TOKEN:-}" ]; then copilot auth login --with-token "$GH_TOKEN" >/dev/null 2>&1 || true; fi`,
+			copilotCommand,
+		}, "; ")
+	}
+
 	return trimmed
 }

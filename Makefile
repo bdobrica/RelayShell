@@ -7,7 +7,7 @@ ifeq ($(GOLANGCI_LINT),)
 GOLANGCI_LINT := $(shell go env GOPATH)/bin/golangci-lint
 endif
 
-.PHONY: all build run test lint fmt tidy install-tools build-codex-image tuwunel-up tuwunel-down tuwunel-logs governor-run matrix-bootstrap dev-run
+.PHONY: all build run test lint fmt tidy install-tools build-codex-image build-copilot-image tuwunel-up tuwunel-down tuwunel-logs governor-run matrix-bootstrap dev-run
 
 all: build
 
@@ -51,6 +51,9 @@ tidy:
 build-codex-image:
 	docker build -f Dockerfile.codex -t relayshell-codex:latest .
 
+build-copilot-image:
+	docker build -f Dockerfile.copilot -t relayshell-copilot:latest .
+
 tuwunel-up:
 	@set -e; \
 	if [ ! -f "$(ENV_FILE)" ]; then \
@@ -75,4 +78,4 @@ tuwunel-logs:
 	fi; \
 	docker compose --env-file $(ENV_FILE) logs -f tuwunel
 
-dev-run: tuwunel-up build-codex-image matrix-bootstrap governor-run
+dev-run: tuwunel-up build-codex-image build-copilot-image matrix-bootstrap governor-run

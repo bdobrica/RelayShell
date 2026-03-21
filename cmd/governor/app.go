@@ -58,13 +58,13 @@ func newApp(cfg config, logger *slog.Logger) (*app, error) {
 		matrix: matrixClient,
 		git:    gitops.NewManager(cfg.WorkspaceBaseDir, cfg.GitAuthorName, cfg.GitAuthorEmail),
 		runner: container.NewRunner(cfg.ContainerRuntime, logger.With("component", "container")),
-		agents: agents.Resolver{
+		agents: agents.NewResolver(agents.BackendOptions{
 			DefaultImage:   cfg.ContainerImage,
 			CodexImage:     cfg.CodexImage,
 			CodexCommand:   cfg.CodexCommand,
 			CopilotImage:   cfg.CopilotImage,
 			CopilotCommand: cfg.CopilotCommand,
-		},
+		}),
 		sessions: store.NewSessionStore(),
 		events:   eventsStore,
 		bridges:  map[string]*bridge.Bridge{},

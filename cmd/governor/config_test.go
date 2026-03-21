@@ -5,11 +5,16 @@ import (
 	"testing"
 )
 
-func TestLoadConfig_DefaultRoomArchivePolicyIsForget(t *testing.T) {
+func seedRequiredMatrixEnv(t *testing.T) {
+	t.Helper()
 	t.Setenv("RELAY_MATRIX_HOMESERVER", "http://localhost:8008")
 	t.Setenv("RELAY_MATRIX_USER_ID", "@relayshell:localhost")
 	t.Setenv("RELAY_MATRIX_ACCESS_TOKEN", "token")
 	t.Setenv("RELAY_MATRIX_GOVERNOR_ROOM_ID", "!room:localhost")
+}
+
+func TestLoadConfig_DefaultRoomArchivePolicyIsForget(t *testing.T) {
+	seedRequiredMatrixEnv(t)
 	t.Setenv("RELAY_SESSION_ROOM_ARCHIVE_POLICY", "")
 
 	cfg, err := loadConfig()
@@ -23,10 +28,7 @@ func TestLoadConfig_DefaultRoomArchivePolicyIsForget(t *testing.T) {
 }
 
 func TestLoadConfig_InvalidRoomArchivePolicy(t *testing.T) {
-	t.Setenv("RELAY_MATRIX_HOMESERVER", "http://localhost:8008")
-	t.Setenv("RELAY_MATRIX_USER_ID", "@relayshell:localhost")
-	t.Setenv("RELAY_MATRIX_ACCESS_TOKEN", "token")
-	t.Setenv("RELAY_MATRIX_GOVERNOR_ROOM_ID", "!room:localhost")
+	seedRequiredMatrixEnv(t)
 	t.Setenv("RELAY_SESSION_ROOM_ARCHIVE_POLICY", "archive")
 
 	_, err := loadConfig()
@@ -40,10 +42,7 @@ func TestLoadConfig_InvalidRoomArchivePolicy(t *testing.T) {
 }
 
 func TestLoadConfig_DefaultDevImageTemplateSettings(t *testing.T) {
-	t.Setenv("RELAY_MATRIX_HOMESERVER", "http://localhost:8008")
-	t.Setenv("RELAY_MATRIX_USER_ID", "@relayshell:localhost")
-	t.Setenv("RELAY_MATRIX_ACCESS_TOKEN", "token")
-	t.Setenv("RELAY_MATRIX_GOVERNOR_ROOM_ID", "!room:localhost")
+	seedRequiredMatrixEnv(t)
 	t.Setenv("RELAY_DEV_IMAGE_TEMPLATES_ENABLED", "")
 	t.Setenv("RELAY_DEV_IMAGE_BUILD_TIMEOUT_SEC", "")
 
@@ -61,10 +60,7 @@ func TestLoadConfig_DefaultDevImageTemplateSettings(t *testing.T) {
 }
 
 func TestLoadConfig_InvalidDevImageBuildTimeout(t *testing.T) {
-	t.Setenv("RELAY_MATRIX_HOMESERVER", "http://localhost:8008")
-	t.Setenv("RELAY_MATRIX_USER_ID", "@relayshell:localhost")
-	t.Setenv("RELAY_MATRIX_ACCESS_TOKEN", "token")
-	t.Setenv("RELAY_MATRIX_GOVERNOR_ROOM_ID", "!room:localhost")
+	seedRequiredMatrixEnv(t)
 	t.Setenv("RELAY_DEV_IMAGE_BUILD_TIMEOUT_SEC", "0")
 
 	_, err := loadConfig()
@@ -74,5 +70,26 @@ func TestLoadConfig_InvalidDevImageBuildTimeout(t *testing.T) {
 
 	if !strings.Contains(err.Error(), "RELAY_DEV_IMAGE_BUILD_TIMEOUT_SEC") {
 		t.Fatalf("error = %q, expected env var name in message", err.Error())
+	}
+}
+
+func TestLoadConfig_DefaultCopilotBackend(t *testing.T) {
+	seedRequiredMatrixEnv(t)
+	t.Setenv("RELAY_AGENT_COPILOT_IMAGE", "")
+	t.Setenv("RELAY_AGENT_COPILOT_COMMAND", "")
+
+	cfg, err := loadConfig()
+	if err != nil {
+		t.Fatalf("loadConfig() error = %v", err)
+	}
+
+	if cfg.CopilotImage != "relayshell-copilot:latest" {
+		t.Fatalf("CopilotImage = %q, want relayshell-copilot:latest", cfg.CopilotImage)
+	}
+	if !strings.Contains(cfg.CopilotCommand, "copilot") {
+		t.Fatalf("CopilotCommand = %q, expected copilot command", cfg.CopilotCommand)
+	}
+	if !strings.Contains(cfg.CopilotCommand, "GH_TOKEN") {
+		t.Fatalf("CopilotCommand = %q, expected GH_TOKEN bootstrap", cfg.CopilotCommand)
 	}
 }

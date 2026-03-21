@@ -24,6 +24,10 @@ Completed roadmap items were moved from `TODO.md` to keep the active TODO focuse
 - Switched dev image language selection from Go template conditionals to Docker build args (`BASE_IMAGE`, `ENABLE_GO`, `ENABLE_PYTHON`, `ENABLE_NODEJS`) for better layer cache reuse.
 - Updated derived image build invocation to pass stack-specific `--build-arg` flags while keeping BuildKit enabled.
 - Renamed devimage renderer files from `dockerfile*.go` to `template_render*.go` to avoid editor/linter Dockerfile misclassification noise.
+- Added explicit `AgentBackend` interface and backend registry-based resolver for all agents.
+- Implemented Copilot backend runtime wiring with dedicated defaults (`relayshell-copilot:latest`, `copilot`) instead of stub `cat` behavior.
+- Added Copilot command token bootstrap (`GH_TOKEN`/`GITHUB_TOKEN`) for non-interactive auth attempts before CLI startup.
+- Added dedicated Copilot worker image definition (`Dockerfile.copilot`) and `make build-copilot-image` target.
 
 ### Completed
 
@@ -45,5 +49,3 @@ Completed roadmap items were moved from `TODO.md` to keep the active TODO focuse
 - Phase 6: SQLite processed-event deduplication with automatic migrations and retention cleanup.
 
 ### Notes
-
-- Copilot backend remains a stub mapping and is not functionally implemented.

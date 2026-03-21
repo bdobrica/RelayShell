@@ -192,6 +192,12 @@ make build
 make build-codex-image
 ```
 
+### Build Copilot Worker Image
+
+```bash
+make build-copilot-image
+```
+
 ### Run Governor (Phase 1 Prototype)
 
 ```bash
@@ -209,6 +215,8 @@ export RELAY_CONTAINER_RUNTIME="docker"
 export RELAY_CONTAINER_IMAGE="alpine:3.20"
 export RELAY_AGENT_CODEX_IMAGE="relayshell-codex:latest"
 export RELAY_AGENT_CODEX_COMMAND="codex"
+export RELAY_AGENT_COPILOT_IMAGE="relayshell-copilot:latest"
+export RELAY_AGENT_COPILOT_COMMAND="copilot"
 export RELAY_BRIDGE_OUTPUT_BATCH_IDLE_MS="300"
 export RELAY_BRIDGE_OUTPUT_FLUSH_MAX_MS="2000"
 export RELAY_BRIDGE_DEBUG_IO="false"
@@ -217,7 +225,7 @@ export RELAY_DEV_IMAGE_TEMPLATES_ENABLED="false"
 export RELAY_DEV_IMAGE_BUILD_TIMEOUT_SEC="600"
 export RELAY_GIT_AUTHOR_NAME=""
 export RELAY_GIT_AUTHOR_EMAIL=""
-export RELAY_CONTAINER_PASSTHROUGH_ENV="OPENAI_API_KEY,OPENAI_BASE_URL,OPENAI_ORG_ID,OPENAI_PROJECT"
+export RELAY_CONTAINER_PASSTHROUGH_ENV="OPENAI_API_KEY,OPENAI_BASE_URL,OPENAI_ORG_ID,OPENAI_PROJECT,GH_TOKEN,GITHUB_TOKEN"
 export RELAY_ALLOWED_USERS="@yourUser:localhost"
 
 # Required for Codex
@@ -227,7 +235,8 @@ make run
 ```
 
 `codex` sessions run inside the dedicated Codex container image and execute the configured Codex command.
-`copilot` is currently a stub mapping (`cat`) and is not a functional backend yet.
+`copilot` sessions run inside the dedicated Copilot container image and execute the configured Copilot command.
+When `GH_TOKEN` or `GITHUB_TOKEN` is passed through, RelayShell attempts non-interactive `copilot auth login --with-token` before launching the Copilot command.
 
 When `RELAY_DEV_IMAGE_TEMPLATES_ENABLED=true`, RelayShell builds a derived image using `internal/devimage/templates/Dockerfile.dev.tmpl` and toggles language install paths via Docker build args (`BASE_IMAGE`, `ENABLE_GO`, `ENABLE_PYTHON`, `ENABLE_NODEJS`) based on detected repository stack.
 

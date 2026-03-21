@@ -1,0 +1,13 @@
+FROM node:22-alpine
+
+ARG COPILOT_NPM_PACKAGE=@github/copilot
+ARG COPILOT_NPM_VERSION=latest
+
+RUN apk add --no-cache bash git openssh-client ca-certificates tini util-linux bubblewrap \
+ && npm install -g "${COPILOT_NPM_PACKAGE}@${COPILOT_NPM_VERSION}" \
+ && copilot --version
+
+WORKDIR /workspace
+
+ENTRYPOINT ["/sbin/tini", "--"]
+CMD ["sh", "-lc", "copilot"]
