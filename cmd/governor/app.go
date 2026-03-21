@@ -307,7 +307,7 @@ func (a *app) startSession(ctx context.Context, ownerUserID string, cmd sessions
 		return nil, err
 	}
 
-	bridgeRef := bridge.New(a.logger.With("session_id", session.ID), a.matrix, session.RoomID, proc, a.cfg.BridgeBatchIdle)
+	bridgeRef := bridge.New(a.logger.With("session_id", session.ID), a.matrix, session.RoomID, proc, a.cfg.BridgeBatchIdle, a.cfg.BridgeFlushMax, a.cfg.BridgeDebugIO)
 	bridgeRef.Start(ctx)
 	a.setBridge(session.RoomID, bridgeRef)
 
@@ -356,7 +356,7 @@ func (a *app) restartSession(ctx context.Context, session *sessions.Session) {
 		return
 	}
 
-	bridgeRef := bridge.New(a.logger.With("session_id", session.ID), a.matrix, session.RoomID, proc, a.cfg.BridgeBatchIdle)
+	bridgeRef := bridge.New(a.logger.With("session_id", session.ID), a.matrix, session.RoomID, proc, a.cfg.BridgeBatchIdle, a.cfg.BridgeFlushMax, a.cfg.BridgeDebugIO)
 	bridgeRef.Start(ctx)
 	a.setBridge(session.RoomID, bridgeRef)
 

@@ -22,6 +22,8 @@ type Bridge struct {
 	roomID    string
 	proc      *container.Process
 	batchIdle time.Duration
+	flushMax  time.Duration
+	debugIO   bool
 	cancel    context.CancelFunc
 
 	typingMu       sync.Mutex
@@ -31,9 +33,12 @@ type Bridge struct {
 
 const defaultOutputBatchIdle = 300 * time.Millisecond
 
-func New(logger *slog.Logger, sender MatrixSender, roomID string, proc *container.Process, batchIdle time.Duration) *Bridge {
+func New(logger *slog.Logger, sender MatrixSender, roomID string, proc *container.Process, batchIdle, flushMax time.Duration, debugIO bool) *Bridge {
 	if batchIdle <= 0 {
 		batchIdle = defaultOutputBatchIdle
+	}
+	if flushMax < 0 {
+		flushMax = 0
 	}
 
 	return &Bridge{
@@ -42,6 +47,8 @@ func New(logger *slog.Logger, sender MatrixSender, roomID string, proc *containe
 		roomID:    roomID,
 		proc:      proc,
 		batchIdle: batchIdle,
+		flushMax:  flushMax,
+		debugIO:   debugIO,
 	}
 }
 
@@ -54,6 +61,10 @@ func (b *Bridge) Start(ctx context.Context) {
 }
 
 func (b *Bridge) ForwardInput(text string) error {
+	if b.debugIO {
+		payload := text + "\r"
+		b.logger.Debug("bridge stdin", "buffer", visualizeNonPrintable(payload))
+	}
 	return b.proc.WriteInput(text)
 }
 
@@ -95,14 +106,21 @@ func (b *Bridge) pumpOutput(ctx context.Context, reader io.Reader, prefix string
 
 	var batch strings.Builder
 	timer := time.NewTimer(b.batchIdle)
-	flushTicker := time.NewTicker(b.activeFlushInterval())
+	hardFlushTimer := time.NewTimer(time.Hour)
 	if !timer.Stop() {
 		select {
 		case <-timer.C:
 		default:
 		}
 	}
+	if !hardFlushTimer.Stop() {
+		select {
+		case <-hardFlushTimer.C:
+		default:
+		}
+	}
 	timerActive := false
+	hardFlushActive := false
 
 	resetTimer := func() {
 		if timerActive {
@@ -117,8 +135,30 @@ func (b *Bridge) pumpOutput(ctx context.Context, reader io.Reader, prefix string
 		timerActive = true
 	}
 
+	startHardFlushTimer := func() {
+		if b.flushMax <= 0 || hardFlushActive {
+			return
+		}
+		hardFlushTimer.Reset(b.flushMax)
+		hardFlushActive = true
+	}
+
+	stopHardFlushTimer := func() {
+		if !hardFlushActive {
+			return
+		}
+		if !hardFlushTimer.Stop() {
+			select {
+			case <-hardFlushTimer.C:
+			default:
+			}
+		}
+		hardFlushActive = false
+	}
+
 	flushBatch := func() error {
 		if batch.Len() == 0 {
+			stopHardFlushTimer()
 			return nil
 		}
 
@@ -138,11 +178,13 @@ func (b *Bridge) pumpOutput(ctx context.Context, reader io.Reader, prefix string
 			if len(raw) > 1<<20 {
 				// Avoid unbounded growth in pathological redraw-only streams.
 				batch.Reset()
+				stopHardFlushTimer()
 			}
 			return nil
 		}
 
 		batch.Reset()
+		stopHardFlushTimer()
 
 		for _, line := range linesToSend {
 			if err := b.sender.SendText(ctx, b.roomID, prefix+line); err != nil {
@@ -154,7 +196,7 @@ func (b *Bridge) pumpOutput(ctx context.Context, reader io.Reader, prefix string
 	}
 
 	defer timer.Stop()
-	defer flushTicker.Stop()
+	defer hardFlushTimer.Stop()
 	defer func() {
 		if typingActive {
 			b.endTyping(ctx)
@@ -173,8 +215,18 @@ func (b *Bridge) pumpOutput(ctx context.Context, reader io.Reader, prefix string
 				chunkCh = nil
 				continue
 			}
+			if b.debugIO {
+				stream := "stdout"
+				if prefix != "" {
+					stream = "stderr"
+				}
+				b.logger.Debug("bridge output", "stream", stream, "buffer", visualizeNonPrintable(chunk))
+			}
 			if prefix == "" {
 				b.respondToTerminalQueries(chunk)
+			}
+			if batch.Len() == 0 {
+				startHardFlushTimer()
 			}
 			batch.WriteString(chunk)
 			if !typingActive {
@@ -194,10 +246,15 @@ func (b *Bridge) pumpOutput(ctx context.Context, reader io.Reader, prefix string
 				typingActive = false
 				b.endTyping(ctx)
 			}
-		case <-flushTicker.C:
+		case <-hardFlushTimer.C:
+			hardFlushActive = false
 			if err := flushBatch(); err != nil {
-				b.logger.Error("bridge periodic flush failed", "error", err)
+				b.logger.Error("bridge hard cap flush failed", "error", err)
 				return
+			}
+			if typingActive {
+				typingActive = false
+				b.endTyping(ctx)
 			}
 		case err := <-errCh:
 			if err != io.EOF {
@@ -298,17 +355,6 @@ func (b *Bridge) typingTimeout() time.Duration {
 		timeout = 5 * time.Second
 	}
 	return timeout
-}
-
-func (b *Bridge) activeFlushInterval() time.Duration {
-	interval := b.batchIdle / 2
-	if interval < 500*time.Millisecond {
-		interval = 500 * time.Millisecond
-	}
-	if interval > 2*time.Second {
-		interval = 2 * time.Second
-	}
-	return interval
 }
 
 func sanitizeTerminalOutput(input string) string {

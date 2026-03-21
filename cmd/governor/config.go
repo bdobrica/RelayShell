@@ -24,6 +24,8 @@ type config struct {
 	ContainerEnv        map[string]string
 	AllowedUsers        map[string]struct{}
 	BridgeBatchIdle     time.Duration
+	BridgeFlushMax      time.Duration
+	BridgeDebugIO       bool
 }
 
 func loadConfig() (config, error) {
@@ -58,6 +60,14 @@ func loadConfig() (config, error) {
 	if err != nil {
 		return config{}, err
 	}
+	bridgeFlushMax, err := envDurationMSAllowZero("RELAY_BRIDGE_OUTPUT_FLUSH_MAX_MS", 2000)
+	if err != nil {
+		return config{}, err
+	}
+	bridgeDebugIO, err := envBool("RELAY_BRIDGE_DEBUG_IO", false)
+	if err != nil {
+		return config{}, err
+	}
 
 	allowedUsers := parseCSVSet(os.Getenv("RELAY_ALLOWED_USERS"))
 
@@ -80,6 +90,8 @@ func loadConfig() (config, error) {
 		ContainerEnv:        containerEnv,
 		AllowedUsers:        allowedUsers,
 		BridgeBatchIdle:     bridgeBatchIdle,
+		BridgeFlushMax:      bridgeFlushMax,
+		BridgeDebugIO:       bridgeDebugIO,
 	}, nil
 }
 
@@ -97,6 +109,20 @@ func envDurationMS(key string, defaultMS int) (time.Duration, error) {
 	return time.Duration(ms) * time.Millisecond, nil
 }
 
+func envDurationMSAllowZero(key string, defaultMS int) (time.Duration, error) {
+	value := strings.TrimSpace(os.Getenv(key))
+	if value == "" {
+		return time.Duration(defaultMS) * time.Millisecond, nil
+	}
+
+	ms, err := strconv.Atoi(value)
+	if err != nil || ms < 0 {
+		return 0, fmt.Errorf("%s must be a non-negative integer (milliseconds)", key)
+	}
+
+	return time.Duration(ms) * time.Millisecond, nil
+}
+
 func envNonNegativeInt(key string, fallback int) (int, error) {
 	value := strings.TrimSpace(os.Getenv(key))
 	if value == "" {
@@ -106,6 +132,20 @@ func envNonNegativeInt(key string, fallback int) (int, error) {
 	parsed, err := strconv.Atoi(value)
 	if err != nil || parsed < 0 {
 		return 0, fmt.Errorf("%s must be a non-negative integer", key)
+	}
+
+	return parsed, nil
+}
+
+func envBool(key string, fallback bool) (bool, error) {
+	value := strings.TrimSpace(os.Getenv(key))
+	if value == "" {
+		return fallback, nil
+	}
+
+	parsed, err := strconv.ParseBool(value)
+	if err != nil {
+		return false, fmt.Errorf("%s must be a boolean (true/false)", key)
 	}
 
 	return parsed, nil
