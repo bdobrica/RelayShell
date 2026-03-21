@@ -100,8 +100,8 @@ These go directly to the agent.
 
 ```text
 /restart   # restart agent session
-/commit    # commit current changes
-/exit      # stop session and cleanup
+/commit    # planned (currently not implemented)
+/exit      # stop session
 /status    # show session state
 ```
 
@@ -117,7 +117,6 @@ Each session goes through:
 * `starting_container`
 * `running`
 * `restarting`
-* `committing`
 * `stopping`
 * `exited`
 * `failed`
@@ -154,9 +153,9 @@ Implement login endpoint with JWT
 
 ---
 
-## ⚙️ Setup (Planned MVP)
+## ⚙️ Setup
 
-> ⚠️ Work in progress
+Current status: core session flow is functional for `agent=codex`; some lifecycle and stability tasks are still in progress.
 
 ### Requirements
 
@@ -222,7 +221,7 @@ make run
 ```
 
 `codex` sessions run inside the dedicated Codex container image and execute the configured Codex command.
-`copilot` remains a placeholder mapping (`cat`) until the Copilot backend is implemented.
+`copilot` is currently a stub mapping (`cat`) and is not a functional backend yet.
 
 ### Config Example
 
@@ -258,28 +257,24 @@ security:
 
 ## 🧱 Roadmap
 
-### MVP
+Completed items are tracked in `CHANGELOG.md`.
 
-* [ ] Matrix bot connectivity
-* [ ] Session creation (`/start`)
-* [ ] Container execution
-* [ ] PTY bridging
-* [ ] Output streaming
-* [ ] `/restart`, `/commit`, `/exit`
+### In Progress
 
-### Next
+* [ ] True PTY integration (currently raw stdio with terminal-command workaround)
+* [ ] Container crash detection and automatic session-state handling
+* [ ] Matrix reconnect backoff/recovery strategy
+* [ ] `/commit` implementation
+* [ ] `/exit` workspace cleanup
 
-* [ ] Persistence (SQLite)
-* [ ] Crash recovery
-* [ ] Multiple agent backends
-* [ ] Worktree optimization
+### Planned
 
-### Future
-
-* [ ] Push to remote
-* [ ] Session summaries
-* [ ] Multi-user support
-* [ ] Web UI (optional)
+* [ ] Git worktree optimization and multi-session repo handling
+* [ ] Session persistence and restore on governor restart
+* [ ] Fully functional Copilot backend
+* [ ] Security hardening (non-root containers, limits, secret handling)
+* [ ] UX improvements (status messages, summaries, formatting)
+* [ ] Observability (metrics, stronger structured logging)
 
 ---
 

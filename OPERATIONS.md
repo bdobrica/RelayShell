@@ -165,6 +165,8 @@ Then use that HTTPS URL in Element Web advanced login.
 3. Send normal prompts; they are forwarded to Codex inside that session container.
 4. Slash commands unknown to RelayShell (for example `/model`) are passed through to the agent in session rooms.
 5. Each forwarded message is submitted with Enter automatically. Use `/enter` to send Enter by itself (for prompts like "Press enter to continue").
+6. Session commands currently available in session rooms: `/status`, `/restart`, `/exit`, `/enter`.
+7. `/commit` is parsed but not implemented yet.
 
 ## 8. Troubleshooting
 
@@ -186,3 +188,11 @@ Then use that HTTPS URL in Element Web advanced login.
 - Processed Matrix message events are persisted in SQLite to avoid replay after governor restarts. Configure the DB location via `RELAY_EVENTS_DB_PATH` (default: `${RELAY_WORKSPACE_BASE_DIR}/governor_events.db`).
 - Processed event retention is configurable via `RELAY_EVENTS_RETENTION_DAYS` (default: `30`). On governor startup, rows older than this many days are deleted. Set to `0` to disable cleanup.
 - RelayShell applies SQLite schema migrations automatically on governor startup using a versioned `schema_migrations` table in the same database.
+
+## 9. Current Limitations
+
+- PTY is not fully implemented yet; RelayShell currently uses raw stdio streams plus command wrapping for interactive Codex behavior.
+- `/commit` is not implemented yet.
+- `/exit` stops sessions but currently does not remove per-session workspace directories automatically.
+- Session persistence is not implemented yet; governor restart clears in-memory session state.
+- Copilot backend is currently a stub and not functionally implemented.
