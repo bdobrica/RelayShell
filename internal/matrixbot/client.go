@@ -81,6 +81,19 @@ func (c *Client) SendText(ctx context.Context, roomID, body string) error {
 	return c.doJSON(ctx, http.MethodPut, path, payload, nil)
 }
 
+func (c *Client) SetTyping(ctx context.Context, roomID string, typing bool, timeout time.Duration) error {
+	path := fmt.Sprintf("/_matrix/client/v3/rooms/%s/typing/%s", url.PathEscape(roomID), url.PathEscape(c.userID))
+
+	payload := map[string]any{
+		"typing": typing,
+	}
+	if typing && timeout > 0 {
+		payload["timeout"] = timeout.Milliseconds()
+	}
+
+	return c.doJSON(ctx, http.MethodPut, path, payload, nil)
+}
+
 func (c *Client) CreateRoom(ctx context.Context, name, topic string, invitees []string) (string, error) {
 	payload := map[string]any{
 		"preset":    "private_chat",

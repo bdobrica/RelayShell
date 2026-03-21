@@ -13,6 +13,7 @@ const (
 	CommandExit    CommandName = "exit"
 	CommandCommit  CommandName = "commit"
 	CommandStatus  CommandName = "status"
+	CommandEnter   CommandName = "enter"
 )
 
 type Command struct {
@@ -36,7 +37,7 @@ func ParseCommand(input string) (Command, error) {
 	name := strings.TrimPrefix(parts[0], "/")
 
 	switch CommandName(name) {
-	case CommandRestart, CommandExit, CommandCommit, CommandStatus:
+	case CommandRestart, CommandExit, CommandCommit, CommandStatus, CommandEnter:
 		if len(parts) != 1 {
 			return Command{}, fmt.Errorf("/%s does not accept arguments", name)
 		}

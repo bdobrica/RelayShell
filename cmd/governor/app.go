@@ -165,6 +165,16 @@ func (a *app) handleSessionEvent(ctx context.Context, session *sessions.Session,
 			_ = a.matrix.SendText(ctx, event.RoomID, fmt.Sprintf("Session %s is %s", session.ID, session.State))
 		case sessions.CommandCommit:
 			_ = a.matrix.SendText(ctx, event.RoomID, "/commit is parsed but implemented in Phase 3")
+		case sessions.CommandEnter:
+			bridgeRef, ok := a.getBridge(session.RoomID)
+			if !ok {
+				_ = a.matrix.SendText(ctx, event.RoomID, "No active container bridge for this session")
+				return
+			}
+			if err := bridgeRef.ForwardInput(""); err != nil {
+				a.logger.Error("forward enter to container failed", "error", err)
+				_ = a.matrix.SendText(ctx, event.RoomID, "Failed to send Enter to agent")
+			}
 		case sessions.CommandRestart:
 			a.restartSession(ctx, session)
 		case sessions.CommandExit:
