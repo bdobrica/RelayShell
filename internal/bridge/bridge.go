@@ -95,6 +95,7 @@ func (b *Bridge) pumpOutput(ctx context.Context, reader io.Reader, prefix string
 
 	var batch strings.Builder
 	timer := time.NewTimer(b.batchIdle)
+	flushTicker := time.NewTicker(b.activeFlushInterval())
 	if !timer.Stop() {
 		select {
 		case <-timer.C:
@@ -121,13 +122,29 @@ func (b *Bridge) pumpOutput(ctx context.Context, reader io.Reader, prefix string
 			return nil
 		}
 
-		renderedLines := renderBatchToLines(batch.String())
-		batch.Reset()
-
+		raw := batch.String()
+		renderedLines := renderBatchToLines(raw)
+		linesToSend := make([]string, 0, len(renderedLines))
 		for _, line := range renderedLines {
 			if strings.TrimSpace(line) == "" {
 				continue
 			}
+			linesToSend = append(linesToSend, line)
+		}
+
+		if len(linesToSend) == 0 {
+			// Keep buffering when we only received control/redraw bytes so the next
+			// chunk can complete a renderable frame.
+			if len(raw) > 1<<20 {
+				// Avoid unbounded growth in pathological redraw-only streams.
+				batch.Reset()
+			}
+			return nil
+		}
+
+		batch.Reset()
+
+		for _, line := range linesToSend {
 			if err := b.sender.SendText(ctx, b.roomID, prefix+line); err != nil {
 				return err
 			}
@@ -137,6 +154,7 @@ func (b *Bridge) pumpOutput(ctx context.Context, reader io.Reader, prefix string
 	}
 
 	defer timer.Stop()
+	defer flushTicker.Stop()
 	defer func() {
 		if typingActive {
 			b.endTyping(ctx)
@@ -154,6 +172,9 @@ func (b *Bridge) pumpOutput(ctx context.Context, reader io.Reader, prefix string
 			if !ok {
 				chunkCh = nil
 				continue
+			}
+			if prefix == "" {
+				b.respondToTerminalQueries(chunk)
 			}
 			batch.WriteString(chunk)
 			if !typingActive {
@@ -173,6 +194,11 @@ func (b *Bridge) pumpOutput(ctx context.Context, reader io.Reader, prefix string
 				typingActive = false
 				b.endTyping(ctx)
 			}
+		case <-flushTicker.C:
+			if err := flushBatch(); err != nil {
+				b.logger.Error("bridge periodic flush failed", "error", err)
+				return
+			}
 		case err := <-errCh:
 			if err != io.EOF {
 				b.logger.Error("bridge reader failed", "error", err)
@@ -187,6 +213,23 @@ func (b *Bridge) pumpOutput(ctx context.Context, reader io.Reader, prefix string
 			return
 		}
 	}
+}
+
+func (b *Bridge) respondToTerminalQueries(chunk string) {
+	respond := func(query, response string) {
+		count := strings.Count(chunk, query)
+		for i := 0; i < count; i++ {
+			if err := b.proc.WriteRaw(response); err != nil {
+				b.logger.Debug("bridge terminal query response failed", "query", query, "error", err)
+				return
+			}
+		}
+	}
+
+	// Report cursor position (CPR).
+	respond("\x1b[6n", "\x1b[1;1R")
+	// Primary device attributes (DA1).
+	respond("\x1b[c", "\x1b[?1;2c")
 }
 
 func (b *Bridge) beginTyping(ctx context.Context) {
@@ -255,6 +298,17 @@ func (b *Bridge) typingTimeout() time.Duration {
 		timeout = 5 * time.Second
 	}
 	return timeout
+}
+
+func (b *Bridge) activeFlushInterval() time.Duration {
+	interval := b.batchIdle / 2
+	if interval < 500*time.Millisecond {
+		interval = 500 * time.Millisecond
+	}
+	if interval > 2*time.Second {
+		interval = 2 * time.Second
+	}
+	return interval
 }
 
 func sanitizeTerminalOutput(input string) string {

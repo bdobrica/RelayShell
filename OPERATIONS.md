@@ -164,6 +164,7 @@ Then use that HTTPS URL in Element Web advanced login.
 2. Enter the new session room.
 3. Send normal prompts; they are forwarded to Codex inside that session container.
 4. Slash commands unknown to RelayShell (for example `/model`) are passed through to the agent in session rooms.
+5. Each forwarded message is submitted with Enter automatically. Use `/enter` to send Enter by itself (for prompts like "Press enter to continue").
 
 ## 8. Troubleshooting
 

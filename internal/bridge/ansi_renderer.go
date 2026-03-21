@@ -81,9 +81,19 @@ func (s *ansiScreen) applyCSI(params string, final byte) {
 		s.applyInsertSpaces(n)
 	case 'X':
 		s.applyEraseChars(n)
-	case 'm', 'h', 'l', 's', 'u':
+	case 'h', 'l':
+		if hasPrivateMode(params, 47) || hasPrivateMode(params, 1047) || hasPrivateMode(params, 1049) {
+			s.reset()
+		}
+	case 'm', 's', 'u':
 		// Formatting and mode toggles don't affect plain text rendering.
 	}
+}
+
+func (s *ansiScreen) reset() {
+	s.rows = make(map[int][]rune)
+	s.row = 0
+	s.col = 0
 }
 
 func (s *ansiScreen) applyEraseInLine(mode int) {
@@ -108,9 +118,10 @@ func (s *ansiScreen) applyEraseInLine(mode int) {
 func (s *ansiScreen) applyEraseInDisplay(mode int) {
 	switch mode {
 	case 2:
-		s.rows = make(map[int][]rune)
-		s.row = 0
-		s.col = 0
+		s.reset()
+	case 3:
+		// Erase saved lines (scrollback) is treated as a full clear for chat rendering.
+		s.reset()
 	case 0:
 		s.applyEraseInLine(0)
 		for r := s.row + 1; ; r++ {
@@ -299,8 +310,25 @@ func consumeANSIEscape(input string, s *ansiScreen) int {
 		}
 		return len(input)
 	default:
+		if next == 'c' {
+			// RIS - full terminal reset.
+			s.reset()
+		}
 		return 2
 	}
+}
+
+func hasPrivateMode(params string, mode int) bool {
+	if params == "" {
+		return false
+	}
+	needle := strconv.Itoa(mode)
+	for _, part := range strings.Split(params, ";") {
+		if strings.TrimPrefix(strings.TrimSpace(part), "?") == needle {
+			return true
+		}
+	}
+	return false
 }
 
 func parseCursorPos(params string) (int, int) {
