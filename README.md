@@ -226,6 +226,11 @@ make run
 `codex` sessions run inside the dedicated Codex container image and execute the configured Codex command.
 `copilot` is currently a stub mapping (`cat`) and is not a functional backend yet.
 
+`/commit` author identity precedence:
+1. `RELAY_GIT_AUTHOR_NAME` / `RELAY_GIT_AUTHOR_EMAIL` (if set)
+2. host global git config (`user.name`, `user.email`)
+3. fallback defaults (`RelayShell`, `relayshell@local`)
+
 ### Config Example
 
 ```yaml

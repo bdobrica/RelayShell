@@ -13,6 +13,7 @@ Completed roadmap items were moved from `TODO.md` to keep the active TODO focuse
 - Added exponential Matrix sync retry backoff (capped) with delay reset after successful recovery.
 - Added explicit broken-pipe/process-exit input recovery with deterministic session failure state and restart guidance.
 - Implemented `/commit`: stage all changes, generate fallback commit message, create commit, and report short SHA + changed files.
+- Added `/commit` author identity resolution precedence: `RELAY_GIT_AUTHOR_*` env vars, then host global git config, then RelayShell defaults.
 
 ### Completed
 
@@ -35,6 +36,5 @@ Completed roadmap items were moved from `TODO.md` to keep the active TODO focuse
 
 ### Notes
 
-- `/exit` is currently partial: it stops the bridge/process and removes session state, but workspace cleanup is still pending.
-- `/commit` is parsed but still not implemented.
+- `/exit` cleanup still has one remaining gap: session room archival policy is not implemented yet.
 - Copilot backend remains a stub mapping and is not functionally implemented.
