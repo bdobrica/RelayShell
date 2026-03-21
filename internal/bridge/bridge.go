@@ -186,10 +186,14 @@ func (b *Bridge) pumpOutput(ctx context.Context, reader io.Reader, prefix string
 		batch.Reset()
 		stopHardFlushTimer()
 
-		for _, line := range linesToSend {
-			if err := b.sender.SendText(ctx, b.roomID, prefix+line); err != nil {
-				return err
+		if prefix != "" {
+			for i := range linesToSend {
+				linesToSend[i] = prefix + linesToSend[i]
 			}
+		}
+
+		if err := b.sender.SendText(ctx, b.roomID, strings.Join(linesToSend, "\n")); err != nil {
+			return err
 		}
 
 		return nil
