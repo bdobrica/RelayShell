@@ -156,7 +156,7 @@ Implement login endpoint with JWT
 
 ## ⚙️ Setup
 
-Current status: core session flow is functional for `agent=codex`; some lifecycle and stability tasks are still in progress.
+Current status: core session flow is functional for `agent=codex`, including stack-aware derived dev image builds (opt-in); some lifecycle and backend tasks are still in progress.
 
 ### Requirements
 
@@ -229,6 +229,8 @@ make run
 `codex` sessions run inside the dedicated Codex container image and execute the configured Codex command.
 `copilot` is currently a stub mapping (`cat`) and is not a functional backend yet.
 
+When `RELAY_DEV_IMAGE_TEMPLATES_ENABLED=true`, RelayShell builds a derived image using `internal/devimage/templates/Dockerfile.dev.tmpl` and toggles language install paths via Docker build args (`BASE_IMAGE`, `ENABLE_GO`, `ENABLE_PYTHON`, `ENABLE_NODEJS`) based on detected repository stack.
+
 `/commit` author identity precedence:
 1. `RELAY_GIT_AUTHOR_NAME` / `RELAY_GIT_AUTHOR_EMAIL` (if set)
 2. host global git config (`user.name`, `user.email`)
@@ -272,14 +274,13 @@ Completed items are tracked in `CHANGELOG.md`.
 
 ### In Progress
 
-* [ ] Interactive behavior tuning for redraw-heavy workloads
-* [x] Session stop/exit room archival policy
+* [ ] Python requirements merge/install for template-driven containers
+* [ ] Better startup/progress notifications for long-running session initialization
 
 ### Planned
 
 * [x] Git worktree optimization and multi-session repo handling
-* [x] Template-driven dev container builds (initial: stack detection + baseline language toolchains)
-* [ ] Python requirements merge/install for template-driven containers
+* [x] Template-driven dev container builds (initial: stack detection + baseline language toolchains + Docker ARG toggles for stack paths)
 * [ ] Session persistence and restore on governor restart
 * [ ] Fully functional Copilot backend
 * [ ] Security hardening (non-root containers, limits, secret handling)

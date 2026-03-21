@@ -23,6 +23,7 @@ Completed roadmap items were moved to `CHANGELOG.md` to keep this file focused o
 
 - [x] Build template-based worker image pipeline managed by governor.
 - [x] Detect repository stack (Go, Python, Node.js, mixed) during session startup.
+- [x] Switch derived image language selection to Docker build args (`BASE_IMAGE`, `ENABLE_GO`, `ENABLE_PYTHON`, `ENABLE_NODEJS`) to improve layer cache reuse.
 - [x] Add language templates with baseline dev tools:
   - [x] Go template: Go, Python, make.
   - [x] Python template: Python, build tools.

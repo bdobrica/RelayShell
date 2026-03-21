@@ -21,6 +21,9 @@ Completed roadmap items were moved from `TODO.md` to keep the active TODO focuse
 - Added Phase 4.5 initial stack detection (`go`, `python`, `node`, `mixed`) for session workspaces.
 - Added template-driven derived worker image generation/build path (opt-in) with safe fallback to base agent image on build failures.
 - Added language-specific baseline dev tool templates for Go, Python, and Node.js stacks.
+- Switched dev image language selection from Go template conditionals to Docker build args (`BASE_IMAGE`, `ENABLE_GO`, `ENABLE_PYTHON`, `ENABLE_NODEJS`) for better layer cache reuse.
+- Updated derived image build invocation to pass stack-specific `--build-arg` flags while keeping BuildKit enabled.
+- Renamed devimage renderer files from `dockerfile*.go` to `template_render*.go` to avoid editor/linter Dockerfile misclassification noise.
 
 ### Completed
 
@@ -43,5 +46,4 @@ Completed roadmap items were moved from `TODO.md` to keep the active TODO focuse
 
 ### Notes
 
-- `/exit` cleanup still has one remaining gap: session room archival policy is not implemented yet.
 - Copilot backend remains a stub mapping and is not functionally implemented.
