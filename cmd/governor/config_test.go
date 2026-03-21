@@ -1,12 +1,11 @@
 package main
-package main
 
 import (
 	"strings"
 	"testing"
 )
 
-func TestLoadConfig_DefaultRoomArchivePolicyIsLeave(t *testing.T) {
+func TestLoadConfig_DefaultRoomArchivePolicyIsForget(t *testing.T) {
 	t.Setenv("RELAY_MATRIX_HOMESERVER", "http://localhost:8008")
 	t.Setenv("RELAY_MATRIX_USER_ID", "@relayshell:localhost")
 	t.Setenv("RELAY_MATRIX_ACCESS_TOKEN", "token")
@@ -18,8 +17,8 @@ func TestLoadConfig_DefaultRoomArchivePolicyIsLeave(t *testing.T) {
 		t.Fatalf("loadConfig() error = %v", err)
 	}
 
-	if cfg.RoomArchivePolicy != roomArchiveLeave {
-		t.Fatalf("RoomArchivePolicy = %q, want %q", cfg.RoomArchivePolicy, roomArchiveLeave)
+	if cfg.RoomArchivePolicy != roomArchiveForget {
+		t.Fatalf("RoomArchivePolicy = %q, want %q", cfg.RoomArchivePolicy, roomArchiveForget)
 	}
 }
 

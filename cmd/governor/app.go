@@ -466,7 +466,7 @@ func (a *app) stopSession(ctx context.Context, session *sessions.Session) {
 	}
 
 	if session.WorkspaceDir != "" {
-		if err := os.RemoveAll(session.WorkspaceDir); err != nil {
+		if err := a.git.CleanupWorkspace(ctx, session.WorkspaceDir); err != nil {
 			a.logger.Error("remove workspace failed", "session_id", session.ID, "workspace", session.WorkspaceDir, "error", err)
 			_ = a.matrix.SendText(ctx, session.RoomID, "Session stopped, but workspace cleanup failed: "+err.Error())
 		}

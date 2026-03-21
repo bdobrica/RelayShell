@@ -81,7 +81,7 @@ func loadConfig() (config, error) {
 	if err != nil {
 		return config{}, err
 	}
-	archivePolicy, err := envRoomArchivePolicy("RELAY_SESSION_ROOM_ARCHIVE_POLICY", roomArchiveLeave)
+	archivePolicy, err := envRoomArchivePolicy("RELAY_SESSION_ROOM_ARCHIVE_POLICY", roomArchiveForget)
 	if err != nil {
 		return config{}, err
 	}

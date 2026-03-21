@@ -15,9 +15,9 @@ Completed roadmap items were moved to `CHANGELOG.md` to keep this file focused o
 
 ### Phase 4 - Git Improvements
 
-- [ ] Replace clone-per-session with worktree-based strategy.
-- [ ] Support multiple sessions per repository more efficiently.
-- [ ] Clean worktrees reliably on session stop/exit.
+- [x] Replace clone-per-session with worktree-based strategy.
+- [x] Support multiple sessions per repository more efficiently.
+- [x] Clean worktrees reliably on session stop/exit.
 
 ### Phase 5 - Agent Backends
 
