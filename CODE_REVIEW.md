@@ -15,6 +15,8 @@ Scope: Current main branch implementation audited against TODO.md roadmap and ru
    - Reference: `cmd/governor/config.go:190`.
 - Implemented exponential Matrix sync retry backoff with recovery reset.
    - Reference: `cmd/governor/app.go:97`.
+- Implemented explicit broken-pipe/process-exit input recovery with session failure transition and `/restart` guidance.
+   - References: `internal/container/runner.go:198`, `cmd/governor/app.go:288`.
 
 These previously high/medium items are now addressed in code.
 

@@ -240,8 +240,7 @@ func (a *app) handleSessionEvent(ctx context.Context, session *sessions.Session,
 					return
 				}
 				if err := bridgeRef.ForwardInput(text); err != nil {
-					a.logger.Error("forward slash command to container failed", "error", err)
-					_ = a.matrix.SendText(ctx, event.RoomID, "Failed to send message to agent")
+					a.handleBridgeInputError(ctx, session, event.RoomID, err)
 				}
 				return
 			}
@@ -262,8 +261,7 @@ func (a *app) handleSessionEvent(ctx context.Context, session *sessions.Session,
 				return
 			}
 			if err := bridgeRef.ForwardInput(""); err != nil {
-				a.logger.Error("forward enter to container failed", "error", err)
-				_ = a.matrix.SendText(ctx, event.RoomID, "Failed to send Enter to agent")
+				a.handleBridgeInputError(ctx, session, event.RoomID, err)
 			}
 		case sessions.CommandRestart:
 			a.restartSession(ctx, session)
@@ -282,9 +280,24 @@ func (a *app) handleSessionEvent(ctx context.Context, session *sessions.Session,
 	}
 
 	if err := bridgeRef.ForwardInput(text); err != nil {
-		a.logger.Error("forward message to container failed", "error", err)
-		_ = a.matrix.SendText(ctx, event.RoomID, "Failed to send message to agent")
+		a.handleBridgeInputError(ctx, session, event.RoomID, err)
 	}
+}
+
+func (a *app) handleBridgeInputError(ctx context.Context, session *sessions.Session, roomID string, err error) {
+	a.logger.Error("forward message to container failed", "session_id", session.ID, "error", err)
+
+	if errors.Is(err, container.ErrBrokenPipe) || errors.Is(err, container.ErrProcessExited) {
+		session.State = sessions.StateFailed
+		if bridgeRef, ok := a.getBridge(session.RoomID); ok {
+			_ = bridgeRef.Stop()
+		}
+		a.deleteBridge(session.RoomID)
+		_ = a.matrix.SendText(ctx, roomID, "Agent input channel is unavailable (process exited or pipe closed). Use /restart to recover.")
+		return
+	}
+
+	_ = a.matrix.SendText(ctx, roomID, "Failed to send message to agent")
 }
 
 func (a *app) startSession(ctx context.Context, ownerUserID string, cmd sessions.Command) (*sessions.Session, error) {

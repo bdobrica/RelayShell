@@ -11,6 +11,7 @@ Completed roadmap items were moved from `TODO.md` to keep the active TODO focuse
 - Added PTY-first container startup (`docker run -it`) with fallback to pipe mode when PTY allocation fails.
 - Updated Codex command normalization for PTY runtime (direct `codex --no-alt-screen` after login step).
 - Added exponential Matrix sync retry backoff (capped) with delay reset after successful recovery.
+- Added explicit broken-pipe/process-exit input recovery with deterministic session failure state and restart guidance.
 
 ### Completed
 

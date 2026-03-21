@@ -43,7 +43,16 @@ type Process struct {
 	ptmx   *os.File
 	done   chan error
 	once   sync.Once
+
+	stateMu sync.RWMutex
+	exited  bool
+	exitErr error
 }
+
+var (
+	ErrProcessExited = errors.New("process exited")
+	ErrBrokenPipe    = errors.New("broken pipe")
+)
 
 func (r *Runner) Start(ctx context.Context, options StartOptions) (*Process, error) {
 	absWorkspaceDir, err := filepath.Abs(options.WorkspaceDir)
@@ -109,7 +118,9 @@ func (r *Runner) startWithPTY(ctx context.Context, args []string) (*Process, err
 	}
 
 	go func() {
-		process.done <- cmd.Wait()
+		err := cmd.Wait()
+		process.setExit(err)
+		process.done <- err
 		close(process.done)
 	}()
 
@@ -145,7 +156,9 @@ func (r *Runner) startWithPipes(ctx context.Context, args []string) (*Process, e
 	}
 
 	go func() {
-		process.done <- cmd.Wait()
+		err := cmd.Wait()
+		process.setExit(err)
+		process.done <- err
 		close(process.done)
 	}()
 
@@ -186,12 +199,24 @@ func (p *Process) WriteInput(input string) error {
 	if p.stdin == nil {
 		return errors.New("stdin is not available")
 	}
+	if exited, err := p.exitStatus(); exited {
+		if err == nil {
+			return ErrProcessExited
+		}
+		return fmt.Errorf("%w: %v", ErrProcessExited, err)
+	}
 	if input != "" {
 		if _, err := io.WriteString(p.stdin, input); err != nil {
+			if isBrokenPipeError(err) {
+				return fmt.Errorf("%w: %v", ErrBrokenPipe, err)
+			}
 			return err
 		}
 	}
 	_, err := io.WriteString(p.stdin, "\r")
+	if err != nil && isBrokenPipeError(err) {
+		return fmt.Errorf("%w: %v", ErrBrokenPipe, err)
+	}
 	return err
 }
 
@@ -199,7 +224,16 @@ func (p *Process) WriteRaw(input string) error {
 	if p.stdin == nil {
 		return errors.New("stdin is not available")
 	}
+	if exited, err := p.exitStatus(); exited {
+		if err == nil {
+			return ErrProcessExited
+		}
+		return fmt.Errorf("%w: %v", ErrProcessExited, err)
+	}
 	_, err := io.WriteString(p.stdin, input)
+	if err != nil && isBrokenPipeError(err) {
+		return fmt.Errorf("%w: %v", ErrBrokenPipe, err)
+	}
 	return err
 }
 
@@ -213,6 +247,29 @@ func (p *Process) Stderr() io.Reader {
 
 func (p *Process) Done() <-chan error {
 	return p.done
+}
+
+func (p *Process) setExit(err error) {
+	p.stateMu.Lock()
+	defer p.stateMu.Unlock()
+	p.exited = true
+	p.exitErr = err
+}
+
+func (p *Process) exitStatus() (bool, error) {
+	p.stateMu.RLock()
+	defer p.stateMu.RUnlock()
+	return p.exited, p.exitErr
+}
+
+func isBrokenPipeError(err error) bool {
+	if err == nil {
+		return false
+	}
+	if errors.Is(err, syscall.EPIPE) || errors.Is(err, os.ErrClosed) {
+		return true
+	}
+	return strings.Contains(strings.ToLower(err.Error()), "broken pipe")
 }
 
 func (p *Process) Stop() error {
