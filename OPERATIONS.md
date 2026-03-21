@@ -181,3 +181,4 @@ Then use that HTTPS URL in Element Web advanced login.
 - RelayShell sends Matrix messages with both plain `body` and HTML `formatted_body` wrapped in `<pre>` for better alignment of terminal-style output.
 - Processed Matrix message events are persisted in SQLite to avoid replay after governor restarts. Configure the DB location via `RELAY_EVENTS_DB_PATH` (default: `${RELAY_WORKSPACE_BASE_DIR}/governor_events.db`).
 - Processed event retention is configurable via `RELAY_EVENTS_RETENTION_DAYS` (default: `30`). On governor startup, rows older than this many days are deleted. Set to `0` to disable cleanup.
+- RelayShell applies SQLite schema migrations automatically on governor startup using a versioned `schema_migrations` table in the same database.
