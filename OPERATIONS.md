@@ -182,6 +182,7 @@ Then use that HTTPS URL in Element Web advanced login.
 - `RELAY_BRIDGE_OUTPUT_FLUSH_MAX_MS` sets a hard cap for continuous output streams (default `2000`). Set it to `0` to disable the hard cap and flush only on idle.
 - RelayShell sends Matrix messages with both plain `body` and HTML `formatted_body` wrapped in `<pre>` for better alignment of terminal-style output.
 - Set `RELAY_BRIDGE_DEBUG_IO=true` to emit debug logs for stdin/stdout/stderr buffers with non-printable bytes rendered as `<HEX>` markers.
+- Bridge I/O debug logs are emitted at debug level; set `RELAY_LOG_LEVEL=debug` to see them.
 - Processed Matrix message events are persisted in SQLite to avoid replay after governor restarts. Configure the DB location via `RELAY_EVENTS_DB_PATH` (default: `${RELAY_WORKSPACE_BASE_DIR}/governor_events.db`).
 - Processed event retention is configurable via `RELAY_EVENTS_RETENTION_DAYS` (default: `30`). On governor startup, rows older than this many days are deleted. Set to `0` to disable cleanup.
 - RelayShell applies SQLite schema migrations automatically on governor startup using a versioned `schema_migrations` table in the same database.

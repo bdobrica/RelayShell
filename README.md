@@ -199,6 +199,7 @@ export RELAY_MATRIX_HOMESERVER="http://localhost:8008"
 export RELAY_MATRIX_USER_ID="@relayshell:localhost"
 export RELAY_MATRIX_ACCESS_TOKEN="YOUR_ACCESS_TOKEN"
 export RELAY_MATRIX_GOVERNOR_ROOM_ID="!governorRoomId:localhost"
+export RELAY_LOG_LEVEL="info"
 
 # Optional overrides
 export RELAY_WORKSPACE_BASE_DIR="/tmp/relayshell"
