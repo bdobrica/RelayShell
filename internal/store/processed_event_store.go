@@ -12,6 +12,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/bdobrica/RelayShell/internal/sessions"
+
 	_ "modernc.org/sqlite"
 )
 
@@ -220,6 +222,175 @@ func (s *ProcessedEventStore) DeleteProcessedBefore(ctx context.Context, cutoff 
 	}
 
 	return rows, nil
+}
+
+func (s *ProcessedEventStore) UpsertSession(ctx context.Context, session *sessions.Session) error {
+	if session == nil {
+		return fmt.Errorf("session is required")
+	}
+
+	if strings.TrimSpace(session.ID) == "" {
+		return fmt.Errorf("session id is required")
+	}
+
+	const statement = `
+INSERT INTO sessions(
+	session_id,
+	repo,
+	branch,
+	agent,
+	owner_user_id,
+	governor_room_id,
+	room_id,
+	workspace_dir,
+	detected_stack,
+	runtime_image,
+	state,
+	created_at_utc,
+	updated_at_utc
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+ON CONFLICT(session_id) DO UPDATE SET
+	repo = excluded.repo,
+	branch = excluded.branch,
+	agent = excluded.agent,
+	owner_user_id = excluded.owner_user_id,
+	governor_room_id = excluded.governor_room_id,
+	room_id = excluded.room_id,
+	workspace_dir = excluded.workspace_dir,
+	detected_stack = excluded.detected_stack,
+	runtime_image = excluded.runtime_image,
+	state = excluded.state,
+	created_at_utc = excluded.created_at_utc,
+	updated_at_utc = excluded.updated_at_utc
+`
+
+	now := time.Now().UTC().Format(time.RFC3339Nano)
+	createdAt := session.CreatedAt.UTC()
+	if createdAt.IsZero() {
+		createdAt = time.Now().UTC()
+	}
+
+	if _, err := s.db.ExecContext(
+		ctx,
+		statement,
+		session.ID,
+		session.Repo,
+		session.Branch,
+		session.Agent,
+		session.OwnerUserID,
+		session.GovernorRoomID,
+		session.RoomID,
+		session.WorkspaceDir,
+		session.DetectedStack,
+		session.RuntimeImage,
+		string(session.State),
+		createdAt.Format(time.RFC3339Nano),
+		now,
+	); err != nil {
+		return fmt.Errorf("upsert session %q: %w", session.ID, err)
+	}
+
+	return nil
+}
+
+func (s *ProcessedEventStore) DeleteSession(ctx context.Context, sessionID string) error {
+	trimmed := strings.TrimSpace(sessionID)
+	if trimmed == "" {
+		return nil
+	}
+
+	if _, err := s.db.ExecContext(ctx, `DELETE FROM sessions WHERE session_id = ?`, trimmed); err != nil {
+		return fmt.Errorf("delete session %q: %w", trimmed, err)
+	}
+
+	return nil
+}
+
+func (s *ProcessedEventStore) ListSessions(ctx context.Context) ([]*sessions.Session, error) {
+	const query = `
+SELECT
+	session_id,
+	repo,
+	branch,
+	agent,
+	owner_user_id,
+	governor_room_id,
+	room_id,
+	workspace_dir,
+	detected_stack,
+	runtime_image,
+	state,
+	created_at_utc
+FROM sessions
+ORDER BY created_at_utc ASC
+`
+
+	rows, err := s.db.QueryContext(ctx, query)
+	if err != nil {
+		return nil, fmt.Errorf("list sessions: %w", err)
+	}
+	defer rows.Close()
+
+	items := make([]*sessions.Session, 0)
+	for rows.Next() {
+		var (
+			sessionID      string
+			repo           string
+			branch         string
+			agent          string
+			ownerUserID    string
+			governorRoomID string
+			roomID         string
+			workspaceDir   string
+			detectedStack  string
+			runtimeImage   string
+			state          string
+			createdAtRaw   string
+		)
+
+		if err := rows.Scan(
+			&sessionID,
+			&repo,
+			&branch,
+			&agent,
+			&ownerUserID,
+			&governorRoomID,
+			&roomID,
+			&workspaceDir,
+			&detectedStack,
+			&runtimeImage,
+			&state,
+			&createdAtRaw,
+		); err != nil {
+			return nil, fmt.Errorf("scan session row: %w", err)
+		}
+
+		createdAt, err := time.Parse(time.RFC3339Nano, createdAtRaw)
+		if err != nil {
+			return nil, fmt.Errorf("parse session created_at for %q: %w", sessionID, err)
+		}
+
+		items = append(items, &sessions.Session{
+			ID:             sessionID,
+			Repo:           repo,
+			Branch:         branch,
+			Agent:          agent,
+			OwnerUserID:    ownerUserID,
+			GovernorRoomID: governorRoomID,
+			RoomID:         roomID,
+			WorkspaceDir:   workspaceDir,
+			DetectedStack:  detectedStack,
+			RuntimeImage:   runtimeImage,
+			State:          sessions.State(state),
+			CreatedAt:      createdAt,
+		})
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate sessions rows: %w", err)
+	}
+
+	return items, nil
 }
 
 func (s *ProcessedEventStore) Close() error {

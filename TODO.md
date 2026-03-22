@@ -45,8 +45,8 @@ Completed roadmap items were moved to `CHANGELOG.md` to keep this file focused o
 
 ### Phase 6 - Persistence
 
-- [ ] Persist live session state (not only processed Matrix events).
-- [ ] Restore sessions after governor restart.
+- [x] Persist live session state (not only processed Matrix events).
+- [x] Restore sessions after governor restart.
 
 ### Phase 7 - Security & Isolation
 

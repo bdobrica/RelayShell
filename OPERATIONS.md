@@ -210,5 +210,5 @@ Then use that HTTPS URL in Element Web advanced login.
 
 - PTY is implemented with a pipe-mode fallback if PTY allocation fails in a given runtime environment.
 - Session processes are now monitored; unexpected container exits trigger a room notification and session state transition.
-- Session persistence is not implemented yet; governor restart clears in-memory session state.
-- Copilot backend is currently a stub and not functionally implemented.
+- Session lifecycle state is persisted in SQLite and restored on governor restart. RelayShell auto-attempts process restore for resumable states.
+- Copilot backend is implemented with dedicated image/command defaults and optional non-interactive token bootstrap.

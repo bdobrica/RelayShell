@@ -93,6 +93,7 @@ func (a *app) run(ctx context.Context) error {
 	}
 
 	a.logger.Info("connected to governor room", "room_id", a.cfg.Matrix.GovernorRoomID)
+	a.restoreSessions(ctx)
 
 	since := ""
 	retryDelay := time.Second
@@ -289,7 +290,7 @@ func (a *app) handleBridgeInputError(ctx context.Context, session *sessions.Sess
 	a.logger.Error("forward message to container failed", "session_id", session.ID, "error", err)
 
 	if errors.Is(err, container.ErrBrokenPipe) || errors.Is(err, container.ErrProcessExited) {
-		session.State = sessions.StateFailed
+		a.setSessionState(ctx, session, sessions.StateFailed)
 		if bridgeRef, ok := a.getBridge(session.RoomID); ok {
 			_ = bridgeRef.Stop()
 		}
@@ -308,11 +309,11 @@ func (a *app) commitSession(ctx context.Context, session *sessions.Session) {
 	}
 
 	previousState := session.State
-	session.State = sessions.StateCommitting
+	a.setSessionState(ctx, session, sessions.StateCommitting)
 
 	result, err := a.git.CommitAll(ctx, session.WorkspaceDir)
 	if err != nil {
-		session.State = previousState
+		a.setSessionState(ctx, session, previousState)
 		if errors.Is(err, gitops.ErrNoChanges) {
 			_ = a.matrix.SendText(ctx, session.RoomID, "No changes to commit")
 			return
@@ -323,7 +324,7 @@ func (a *app) commitSession(ctx context.Context, session *sessions.Session) {
 		return
 	}
 
-	session.State = previousState
+	a.setSessionState(ctx, session, previousState)
 
 	summary := []string{
 		"Commit created",
@@ -359,15 +360,15 @@ func (a *app) startSession(ctx context.Context, ownerUserID string, cmd sessions
 		CreatedAt:      time.Now().UTC(),
 	}
 
-	session.State = sessions.StatePreparingWorkspace
+	a.setSessionState(ctx, session, sessions.StatePreparingWorkspace)
 	workspaceDir, err := a.git.Prepare(ctx, session.ID, session.Repo, session.Branch)
 	if err != nil {
-		session.State = sessions.StateFailed
+		a.setSessionState(ctx, session, sessions.StateFailed)
 		return nil, err
 	}
 	session.WorkspaceDir = workspaceDir
 
-	session.State = sessions.StateCreatingRoom
+	a.setSessionState(ctx, session, sessions.StateCreatingRoom)
 	roomID, err := a.matrix.CreateRoom(
 		ctx,
 		fmt.Sprintf("RelayShell Session %s", session.ID),
@@ -375,15 +376,17 @@ func (a *app) startSession(ctx context.Context, ownerUserID string, cmd sessions
 		[]string{ownerUserID},
 	)
 	if err != nil {
-		session.State = sessions.StateFailed
+		a.setSessionState(ctx, session, sessions.StateFailed)
 		return nil, err
 	}
 	session.RoomID = roomID
+	a.sessions.Add(session)
+	a.persistSession(ctx, session)
 
-	session.State = sessions.StateStartingContainer
+	a.setSessionState(ctx, session, sessions.StateStartingContainer)
 	agentSpec, err := a.agents.Resolve(session.Agent)
 	if err != nil {
-		session.State = sessions.StateFailed
+		a.setSessionState(ctx, session, sessions.StateFailed)
 		return nil, err
 	}
 
@@ -414,7 +417,7 @@ func (a *app) startSession(ctx context.Context, ownerUserID string, cmd sessions
 		Env:          a.cfg.ContainerEnv,
 	})
 	if err != nil {
-		session.State = sessions.StateFailed
+		a.setSessionState(ctx, session, sessions.StateFailed)
 		return nil, err
 	}
 
@@ -423,8 +426,7 @@ func (a *app) startSession(ctx context.Context, ownerUserID string, cmd sessions
 	a.setBridge(session.RoomID, bridgeRef)
 	a.watchProcessExit(session, proc)
 
-	session.State = sessions.StateRunning
-	a.sessions.Add(session)
+	a.setSessionState(ctx, session, sessions.StateRunning)
 
 	metadata := strings.Join([]string{
 		"RelayShell session started",
@@ -474,7 +476,7 @@ func (a *app) resolveRuntimeImage(ctx context.Context, session *sessions.Session
 }
 
 func (a *app) restartSession(ctx context.Context, session *sessions.Session) {
-	session.State = sessions.StateRestarting
+	a.setSessionState(ctx, session, sessions.StateRestarting)
 
 	if oldBridge, ok := a.getBridge(session.RoomID); ok {
 		_ = oldBridge.Stop()
@@ -482,7 +484,7 @@ func (a *app) restartSession(ctx context.Context, session *sessions.Session) {
 
 	agentSpec, err := a.agents.Resolve(session.Agent)
 	if err != nil {
-		session.State = sessions.StateFailed
+		a.setSessionState(ctx, session, sessions.StateFailed)
 		a.logger.Error("agent resolution failed", "session_id", session.ID, "error", err)
 		_ = a.matrix.SendText(ctx, session.RoomID, "Failed to resolve agent runtime")
 		return
@@ -503,7 +505,7 @@ func (a *app) restartSession(ctx context.Context, session *sessions.Session) {
 		Env:          a.cfg.ContainerEnv,
 	})
 	if err != nil {
-		session.State = sessions.StateFailed
+		a.setSessionState(ctx, session, sessions.StateFailed)
 		a.logger.Error("restart session failed", "session_id", session.ID, "error", err)
 		_ = a.matrix.SendText(ctx, session.RoomID, "Failed to restart session")
 		return
@@ -514,12 +516,12 @@ func (a *app) restartSession(ctx context.Context, session *sessions.Session) {
 	a.setBridge(session.RoomID, bridgeRef)
 	a.watchProcessExit(session, proc)
 
-	session.State = sessions.StateRunning
+	a.setSessionState(ctx, session, sessions.StateRunning)
 	_ = a.matrix.SendText(ctx, session.RoomID, "Session restarted")
 }
 
 func (a *app) stopSession(ctx context.Context, session *sessions.Session) {
-	session.State = sessions.StateStopping
+	a.setSessionState(ctx, session, sessions.StateStopping)
 
 	if bridgeRef, ok := a.getBridge(session.RoomID); ok {
 		_ = bridgeRef.Stop()
@@ -535,6 +537,7 @@ func (a *app) stopSession(ctx context.Context, session *sessions.Session) {
 
 	a.sessions.Delete(session.ID)
 	session.State = sessions.StateExited
+	a.deletePersistedSession(ctx, session.ID)
 	_ = a.matrix.SendText(ctx, session.RoomID, "Session stopped")
 
 	a.applyRoomArchivePolicy(session)
@@ -587,16 +590,84 @@ func (a *app) watchProcessExit(session *sessions.Session, proc *container.Proces
 
 		message := "Agent process exited. Use /restart to start it again."
 		if err != nil {
-			session.State = sessions.StateFailed
+			a.setSessionState(context.Background(), session, sessions.StateFailed)
 			message = "Agent process exited unexpectedly: " + err.Error()
 		} else {
-			session.State = sessions.StateExited
+			a.setSessionState(context.Background(), session, sessions.StateExited)
 		}
 
 		if sendErr := a.matrix.SendText(context.Background(), session.RoomID, message); sendErr != nil {
 			a.logger.Error("send process exit notification failed", "session_id", session.ID, "room_id", session.RoomID, "error", sendErr)
 		}
 	}()
+}
+
+func (a *app) persistSession(ctx context.Context, session *sessions.Session) {
+	if session == nil {
+		return
+	}
+	if strings.TrimSpace(session.RoomID) == "" {
+		return
+	}
+	if err := a.events.UpsertSession(ctx, session); err != nil {
+		a.logger.Error("persist session failed", "session_id", session.ID, "room_id", session.RoomID, "error", err)
+	}
+}
+
+func (a *app) setSessionState(ctx context.Context, session *sessions.Session, state sessions.State) {
+	if session == nil {
+		return
+	}
+	session.State = state
+	a.persistSession(ctx, session)
+}
+
+func (a *app) deletePersistedSession(ctx context.Context, sessionID string) {
+	if err := a.events.DeleteSession(ctx, sessionID); err != nil {
+		a.logger.Error("delete persisted session failed", "session_id", sessionID, "error", err)
+	}
+}
+
+func (a *app) restoreSessions(ctx context.Context) {
+	persistedSessions, err := a.events.ListSessions(ctx)
+	if err != nil {
+		a.logger.Error("list persisted sessions failed", "error", err)
+		return
+	}
+	if len(persistedSessions) == 0 {
+		return
+	}
+
+	a.logger.Info("loaded persisted sessions", "count", len(persistedSessions))
+	for _, session := range persistedSessions {
+		if strings.TrimSpace(session.RoomID) == "" {
+			a.logger.Warn("skipping persisted session without room id", "session_id", session.ID)
+			continue
+		}
+
+		a.sessions.Add(session)
+		if !shouldAutoRestoreSession(session.State) {
+			continue
+		}
+
+		_ = a.matrix.SendText(ctx, session.RoomID, "Governor restarted. Restoring session process...")
+		a.restartSession(ctx, session)
+	}
+}
+
+func shouldAutoRestoreSession(state sessions.State) bool {
+	switch state {
+	case sessions.StateCreating,
+		sessions.StatePreparingWorkspace,
+		sessions.StateCreatingRoom,
+		sessions.StateStartingContainer,
+		sessions.StateRunning,
+		sessions.StateCommitting,
+		sessions.StateRestarting:
+		return true
+	default:
+		return false
+	}
 }
 
 func (a *app) isAllowedUser(userID string) bool {

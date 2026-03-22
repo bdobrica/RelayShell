@@ -1,5 +1,14 @@
 # Changelog
 
+## 2026-03-22
+
+### Completed
+
+- Phase 6: Added persisted session lifecycle state in SQLite (`sessions` table) with migration support.
+- Phase 6: Added governor startup session restore flow that reloads persisted sessions and auto-restarts resumable sessions.
+- Added session persistence lifecycle hooks for state updates, stop-path deletion, and process-exit state transitions.
+- Added tests covering session persistence CRUD and auto-restore state policy.
+
 ## 2026-03-21
 
 Completed roadmap items were moved from `TODO.md` to keep the active TODO focused.

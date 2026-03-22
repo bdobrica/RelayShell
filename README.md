@@ -156,7 +156,7 @@ Implement login endpoint with JWT
 
 ## ⚙️ Setup
 
-Current status: core session flow is functional for `agent=codex`, including stack-aware derived dev image builds (opt-in); some lifecycle and backend tasks are still in progress.
+Current status: core session flow is functional for `agent=codex`, including stack-aware derived dev image builds (opt-in) and persisted session lifecycle restore after governor restart; some backend and hardening tasks are still in progress.
 
 ### Requirements
 
@@ -290,7 +290,7 @@ Completed items are tracked in `CHANGELOG.md`.
 
 * [x] Git worktree optimization and multi-session repo handling
 * [x] Template-driven dev container builds (initial: stack detection + baseline language toolchains + Docker ARG toggles for stack paths)
-* [ ] Session persistence and restore on governor restart
+* [x] Session persistence and restore on governor restart
 * [ ] Fully functional Copilot backend
 * [ ] Security hardening (non-root containers, limits, secret handling)
 * [ ] UX improvements (status messages, summaries, formatting)
