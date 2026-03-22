@@ -50,10 +50,10 @@ Completed roadmap items were moved to `CHANGELOG.md` to keep this file focused o
 
 ### Phase 7 - Security & Isolation
 
-- [ ] Run worker containers as non-root.
-- [ ] Apply CPU/memory limits.
-- [ ] Optional network restrictions per worker.
-- [ ] Strengthen secret handling practices.
+- [x] Run worker containers as non-root.
+- [x] Apply CPU/memory limits.
+- [x] Optional network restrictions per worker.
+- [x] Strengthen secret handling practices.
 
 ### Phase 8 - UX Improvements
 

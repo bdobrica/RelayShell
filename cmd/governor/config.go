@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"os/user"
 	"strconv"
 	"strings"
 	"time"
@@ -11,26 +12,31 @@ import (
 )
 
 type config struct {
-	Matrix              matrixbot.Config
-	WorkspaceBaseDir    string
-	EventsDBPath        string
-	EventsRetentionDays int
-	ContainerRuntime    string
-	ContainerImage      string
-	CodexImage          string
-	CodexCommand        string
-	CopilotImage        string
-	CopilotCommand      string
-	ContainerEnv        map[string]string
-	GitAuthorName       string
-	GitAuthorEmail      string
-	AllowedUsers        map[string]struct{}
-	BridgeBatchIdle     time.Duration
-	BridgeFlushMax      time.Duration
-	BridgeDebugIO       bool
-	RoomArchivePolicy   roomArchivePolicy
-	DevImageTemplates   bool
-	DevImageBuildTO     time.Duration
+	Matrix                matrixbot.Config
+	WorkspaceBaseDir      string
+	EventsDBPath          string
+	EventsRetentionDays   int
+	ContainerRuntime      string
+	ContainerImage        string
+	ContainerRunAsNonRoot bool
+	ContainerRunAsUser    string
+	ContainerCPULimit     string
+	ContainerMemory       string
+	ContainerNetwork      string
+	CodexImage            string
+	CodexCommand          string
+	CopilotImage          string
+	CopilotCommand        string
+	ContainerEnv          map[string]string
+	GitAuthorName         string
+	GitAuthorEmail        string
+	AllowedUsers          map[string]struct{}
+	BridgeBatchIdle       time.Duration
+	BridgeFlushMax        time.Duration
+	BridgeDebugIO         bool
+	RoomArchivePolicy     roomArchivePolicy
+	DevImageTemplates     bool
+	DevImageBuildTO       time.Duration
 }
 
 type roomArchivePolicy string
@@ -59,6 +65,20 @@ func loadConfig() (config, error) {
 	}
 	containerRuntime := envWithDefault("RELAY_CONTAINER_RUNTIME", "docker")
 	containerImage := envWithDefault("RELAY_CONTAINER_IMAGE", "alpine:3.20")
+	runAsNonRoot, err := envBool("RELAY_CONTAINER_RUN_AS_NON_ROOT", true)
+	if err != nil {
+		return config{}, err
+	}
+	containerRunAsUser := strings.TrimSpace(os.Getenv("RELAY_CONTAINER_RUN_AS_USER"))
+	if containerRunAsUser == "" && runAsNonRoot {
+		containerRunAsUser = currentNumericUserSpec()
+	}
+	containerCPULimit, err := envPositiveFloatString("RELAY_CONTAINER_CPU_LIMIT")
+	if err != nil {
+		return config{}, err
+	}
+	containerMemory := strings.TrimSpace(os.Getenv("RELAY_CONTAINER_MEMORY_LIMIT"))
+	containerNetwork := strings.TrimSpace(os.Getenv("RELAY_CONTAINER_NETWORK"))
 	codexImage := envWithDefault("RELAY_AGENT_CODEX_IMAGE", "relayshell-codex:latest")
 	codexCommand := normalizeCodexCommand(envWithDefault("RELAY_AGENT_CODEX_COMMAND", "codex"))
 	copilotImage := envWithDefault("RELAY_AGENT_COPILOT_IMAGE", "relayshell-copilot:latest")
@@ -105,25 +125,30 @@ func loadConfig() (config, error) {
 			AccessToken:    accessToken,
 			GovernorRoomID: governorRoomID,
 		},
-		WorkspaceBaseDir:    workspaceBaseDir,
-		EventsDBPath:        eventsDBPath,
-		EventsRetentionDays: eventsRetentionDays,
-		ContainerRuntime:    containerRuntime,
-		ContainerImage:      containerImage,
-		CodexImage:          codexImage,
-		CodexCommand:        codexCommand,
-		CopilotImage:        copilotImage,
-		CopilotCommand:      copilotCommand,
-		ContainerEnv:        containerEnv,
-		GitAuthorName:       gitAuthorName,
-		GitAuthorEmail:      gitAuthorEmail,
-		AllowedUsers:        allowedUsers,
-		BridgeBatchIdle:     bridgeBatchIdle,
-		BridgeFlushMax:      bridgeFlushMax,
-		BridgeDebugIO:       bridgeDebugIO,
-		RoomArchivePolicy:   archivePolicy,
-		DevImageTemplates:   devImageTemplates,
-		DevImageBuildTO:     devImageBuildTO,
+		WorkspaceBaseDir:      workspaceBaseDir,
+		EventsDBPath:          eventsDBPath,
+		EventsRetentionDays:   eventsRetentionDays,
+		ContainerRuntime:      containerRuntime,
+		ContainerImage:        containerImage,
+		ContainerRunAsNonRoot: runAsNonRoot,
+		ContainerRunAsUser:    containerRunAsUser,
+		ContainerCPULimit:     containerCPULimit,
+		ContainerMemory:       containerMemory,
+		ContainerNetwork:      containerNetwork,
+		CodexImage:            codexImage,
+		CodexCommand:          codexCommand,
+		CopilotImage:          copilotImage,
+		CopilotCommand:        copilotCommand,
+		ContainerEnv:          containerEnv,
+		GitAuthorName:         gitAuthorName,
+		GitAuthorEmail:        gitAuthorEmail,
+		AllowedUsers:          allowedUsers,
+		BridgeBatchIdle:       bridgeBatchIdle,
+		BridgeFlushMax:        bridgeFlushMax,
+		BridgeDebugIO:         bridgeDebugIO,
+		RoomArchivePolicy:     archivePolicy,
+		DevImageTemplates:     devImageTemplates,
+		DevImageBuildTO:       devImageBuildTO,
 	}, nil
 }
 
@@ -211,6 +236,20 @@ func envBool(key string, fallback bool) (bool, error) {
 	return parsed, nil
 }
 
+func envPositiveFloatString(key string) (string, error) {
+	value := strings.TrimSpace(os.Getenv(key))
+	if value == "" {
+		return "", nil
+	}
+
+	parsed, err := strconv.ParseFloat(value, 64)
+	if err != nil || parsed <= 0 {
+		return "", fmt.Errorf("%s must be a positive number", key)
+	}
+
+	return value, nil
+}
+
 func envWithDefault(key, fallback string) string {
 	value := strings.TrimSpace(os.Getenv(key))
 	if value == "" {
@@ -247,6 +286,27 @@ func collectProcessEnv(names []string) map[string]string {
 		}
 	}
 	return env
+}
+
+func currentNumericUserSpec() string {
+	currentUser, err := user.Current()
+	if err != nil {
+		return ""
+	}
+
+	uid := strings.TrimSpace(currentUser.Uid)
+	gid := strings.TrimSpace(currentUser.Gid)
+	if uid == "" || gid == "" {
+		return ""
+	}
+	if _, err := strconv.Atoi(uid); err != nil {
+		return ""
+	}
+	if _, err := strconv.Atoi(gid); err != nil {
+		return ""
+	}
+
+	return uid + ":" + gid
 }
 
 func normalizeCodexCommand(value string) string {

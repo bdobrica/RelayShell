@@ -33,6 +33,10 @@ type StartOptions struct {
 	Image        string
 	Command      string
 	Env          map[string]string
+	RunAsUser    string
+	CPULimit     string
+	MemoryLimit  string
+	Network      string
 }
 
 type Process struct {
@@ -60,6 +64,23 @@ func (r *Runner) Start(ctx context.Context, options StartOptions) (*Process, err
 		return nil, fmt.Errorf("resolve workspace path: %w", err)
 	}
 
+	args := buildRunArgs(absWorkspaceDir, options)
+
+	proc, err := r.startWithPTY(ctx, args, options.Env)
+	if err == nil {
+		return proc, nil
+	}
+
+	r.Logger.Warn("PTY startup failed, falling back to pipe mode", "error", err)
+
+	pipeArgs := make([]string, len(args))
+	copy(pipeArgs, args)
+	pipeArgs = removeArg(pipeArgs, "-t")
+
+	return r.startWithPipes(ctx, pipeArgs, options.Env)
+}
+
+func buildRunArgs(absWorkspaceDir string, options StartOptions) []string {
 	args := []string{
 		"run",
 		"--rm",
@@ -73,7 +94,20 @@ func (r *Runner) Start(ctx context.Context, options StartOptions) (*Process, err
 		"/workspace",
 	}
 
-	for _, envVar := range sortedEnvFlags(options.Env) {
+	if trimmed := strings.TrimSpace(options.RunAsUser); trimmed != "" {
+		args = append(args, "--user", trimmed)
+	}
+	if trimmed := strings.TrimSpace(options.CPULimit); trimmed != "" {
+		args = append(args, "--cpus", trimmed)
+	}
+	if trimmed := strings.TrimSpace(options.MemoryLimit); trimmed != "" {
+		args = append(args, "--memory", trimmed)
+	}
+	if trimmed := strings.TrimSpace(options.Network); trimmed != "" {
+		args = append(args, "--network", trimmed)
+	}
+
+	for _, envVar := range sortedEnvKeys(options.Env) {
 		args = append(args, "-e", envVar)
 	}
 
@@ -84,22 +118,12 @@ func (r *Runner) Start(ctx context.Context, options StartOptions) (*Process, err
 		options.Command,
 	)
 
-	proc, err := r.startWithPTY(ctx, args)
-	if err == nil {
-		return proc, nil
-	}
-
-	r.Logger.Warn("PTY startup failed, falling back to pipe mode", "error", err)
-
-	pipeArgs := make([]string, len(args))
-	copy(pipeArgs, args)
-	pipeArgs = removeArg(pipeArgs, "-t")
-
-	return r.startWithPipes(ctx, pipeArgs)
+	return args
 }
 
-func (r *Runner) startWithPTY(ctx context.Context, args []string) (*Process, error) {
+func (r *Runner) startWithPTY(ctx context.Context, args []string, env map[string]string) (*Process, error) {
 	cmd := exec.CommandContext(ctx, r.Runtime, args...)
+	cmd.Env = mergedCommandEnv(env)
 
 	ptmx, err := pty.Start(cmd)
 	if err != nil {
@@ -127,8 +151,9 @@ func (r *Runner) startWithPTY(ctx context.Context, args []string) (*Process, err
 	return process, nil
 }
 
-func (r *Runner) startWithPipes(ctx context.Context, args []string) (*Process, error) {
+func (r *Runner) startWithPipes(ctx context.Context, args []string, env map[string]string) (*Process, error) {
 	cmd := exec.CommandContext(ctx, r.Runtime, args...)
+	cmd.Env = mergedCommandEnv(env)
 
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
@@ -178,7 +203,7 @@ func removeArg(args []string, target string) []string {
 	return result
 }
 
-func sortedEnvFlags(values map[string]string) []string {
+func sortedEnvKeys(values map[string]string) []string {
 	if len(values) == 0 {
 		return nil
 	}
@@ -188,11 +213,15 @@ func sortedEnvFlags(values map[string]string) []string {
 	}
 	sort.Strings(keys)
 
-	result := make([]string, 0, len(keys))
-	for _, key := range keys {
-		result = append(result, fmt.Sprintf("%s=%s", key, values[key]))
+	return keys
+}
+
+func mergedCommandEnv(values map[string]string) []string {
+	merged := append([]string{}, os.Environ()...)
+	for _, key := range sortedEnvKeys(values) {
+		merged = append(merged, key+"="+values[key])
 	}
-	return result
+	return merged
 }
 
 func (p *Process) WriteInput(input string) error {

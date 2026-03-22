@@ -205,6 +205,12 @@ Then use that HTTPS URL in Element Web advanced login.
 - Processed Matrix message events are persisted in SQLite to avoid replay after governor restarts. Configure the DB location via `RELAY_EVENTS_DB_PATH` (default: `${RELAY_WORKSPACE_BASE_DIR}/governor_events.db`).
 - Processed event retention is configurable via `RELAY_EVENTS_RETENTION_DAYS` (default: `30`). On governor startup, rows older than this many days are deleted. Set to `0` to disable cleanup.
 - RelayShell applies SQLite schema migrations automatically on governor startup using a versioned `schema_migrations` table in the same database.
+- Worker runtime isolation controls:
+  1. `RELAY_CONTAINER_RUN_AS_NON_ROOT=true` (default) uses host numeric UID:GID, unless overridden with `RELAY_CONTAINER_RUN_AS_USER`.
+  2. `RELAY_CONTAINER_CPU_LIMIT` maps to container runtime `--cpus`.
+  3. `RELAY_CONTAINER_MEMORY_LIMIT` maps to container runtime `--memory`.
+  4. `RELAY_CONTAINER_NETWORK` maps to container runtime `--network` (for example: `none`).
+- Secret passthrough variables configured in `RELAY_CONTAINER_PASSTHROUGH_ENV` are injected by name (`-e KEY`) and not rendered as `KEY=value` in runtime command arguments.
 
 ## 9. Current Limitations
 
@@ -212,3 +218,4 @@ Then use that HTTPS URL in Element Web advanced login.
 - Session processes are now monitored; unexpected container exits trigger a room notification and session state transition.
 - Session lifecycle state is persisted in SQLite and restored on governor restart. RelayShell auto-attempts process restore for resumable states.
 - Copilot backend is implemented with dedicated image/command defaults and optional non-interactive token bootstrap.
+- Container runtime hardening is currently runtime-flag based (user/CPU/memory/network). Further sandboxing (seccomp/apparmor/capabilities profiles) is not implemented yet.

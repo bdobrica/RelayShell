@@ -8,6 +8,11 @@
 - Phase 6: Added governor startup session restore flow that reloads persisted sessions and auto-restarts resumable sessions.
 - Added session persistence lifecycle hooks for state updates, stop-path deletion, and process-exit state transitions.
 - Added tests covering session persistence CRUD and auto-restore state policy.
+- Phase 7: Added worker container non-root execution controls via `RELAY_CONTAINER_RUN_AS_NON_ROOT` and `RELAY_CONTAINER_RUN_AS_USER`.
+- Phase 7: Added optional worker resource isolation controls via `RELAY_CONTAINER_CPU_LIMIT` and `RELAY_CONTAINER_MEMORY_LIMIT`.
+- Phase 7: Added optional worker network isolation control via `RELAY_CONTAINER_NETWORK`.
+- Phase 7: Hardened secret handling by passing passthrough env vars as key-only runtime flags (`-e KEY`) instead of embedding `KEY=value` in container command arguments.
+- Added tests for Phase 7 config parsing and container runner argument/env construction.
 
 ## 2026-03-21
 

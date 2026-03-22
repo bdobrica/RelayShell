@@ -213,6 +213,11 @@ export RELAY_EVENTS_DB_PATH="/tmp/relayshell/governor_events.db"
 export RELAY_EVENTS_RETENTION_DAYS="30"
 export RELAY_CONTAINER_RUNTIME="docker"
 export RELAY_CONTAINER_IMAGE="alpine:3.20"
+export RELAY_CONTAINER_RUN_AS_NON_ROOT="true"
+export RELAY_CONTAINER_RUN_AS_USER=""
+export RELAY_CONTAINER_CPU_LIMIT="1.5"
+export RELAY_CONTAINER_MEMORY_LIMIT="2g"
+export RELAY_CONTAINER_NETWORK=""
 export RELAY_AGENT_CODEX_IMAGE="relayshell-codex:latest"
 export RELAY_AGENT_CODEX_COMMAND="codex"
 export RELAY_AGENT_COPILOT_IMAGE="relayshell-copilot:latest"
@@ -292,7 +297,7 @@ Completed items are tracked in `CHANGELOG.md`.
 * [x] Template-driven dev container builds (initial: stack detection + baseline language toolchains + Docker ARG toggles for stack paths)
 * [x] Session persistence and restore on governor restart
 * [ ] Fully functional Copilot backend
-* [ ] Security hardening (non-root containers, limits, secret handling)
+* [x] Security hardening (non-root containers, limits, secret handling)
 * [ ] UX improvements (status messages, summaries, formatting)
 * [ ] Observability (metrics, stronger structured logging)
 

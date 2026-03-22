@@ -52,6 +52,10 @@ func newApp(cfg config, logger *slog.Logger) (*app, error) {
 		return nil, fmt.Errorf("init processed event store: %w", err)
 	}
 
+	if cfg.ContainerRunAsNonRoot && strings.TrimSpace(cfg.ContainerRunAsUser) == "" {
+		logger.Warn("container non-root user is not configured; workers may run with image default user")
+	}
+
 	return &app{
 		cfg:    cfg,
 		logger: logger,
@@ -415,6 +419,10 @@ func (a *app) startSession(ctx context.Context, ownerUserID string, cmd sessions
 		Image:        runtimeImage,
 		Command:      agentSpec.Command,
 		Env:          a.cfg.ContainerEnv,
+		RunAsUser:    a.cfg.ContainerRunAsUser,
+		CPULimit:     a.cfg.ContainerCPULimit,
+		MemoryLimit:  a.cfg.ContainerMemory,
+		Network:      a.cfg.ContainerNetwork,
 	})
 	if err != nil {
 		a.setSessionState(ctx, session, sessions.StateFailed)
@@ -503,6 +511,10 @@ func (a *app) restartSession(ctx context.Context, session *sessions.Session) {
 		Image:        runtimeImage,
 		Command:      agentSpec.Command,
 		Env:          a.cfg.ContainerEnv,
+		RunAsUser:    a.cfg.ContainerRunAsUser,
+		CPULimit:     a.cfg.ContainerCPULimit,
+		MemoryLimit:  a.cfg.ContainerMemory,
+		Network:      a.cfg.ContainerNetwork,
 	})
 	if err != nil {
 		a.setSessionState(ctx, session, sessions.StateFailed)
