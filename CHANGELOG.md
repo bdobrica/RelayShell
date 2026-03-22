@@ -13,6 +13,10 @@
 - Phase 7: Added optional worker network isolation control via `RELAY_CONTAINER_NETWORK`.
 - Phase 7: Hardened secret handling by passing passthrough env vars as key-only runtime flags (`-e KEY`) instead of embedding `KEY=value` in container command arguments.
 - Added tests for Phase 7 config parsing and container runner argument/env construction.
+- Added session commands: `/tree`, `/diff`, `/diff <relative-file>`, and `/push`.
+- Added git workspace tree rendering and diff summary/details for session command handlers.
+- Added `/push` SSH key configuration via `RELAY_GIT_PUSH_SSH_KEY_PATH` or `RELAY_GIT_PUSH_SSH_PRIVATE_KEY`, with configurable remote (`RELAY_GIT_PUSH_REMOTE`).
+- Added parser and gitops tests covering new command parsing and git command helpers.
 
 ## 2026-03-21
 

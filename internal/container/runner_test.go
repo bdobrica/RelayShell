@@ -1,5 +1,4 @@
 package container
-package container
 
 import (
 	"strings"

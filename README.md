@@ -101,6 +101,10 @@ These go directly to the agent.
 ```text
 /restart   # restart agent session
 /commit    # create a git commit from workspace changes
+/tree      # show workspace tree
+/diff      # show changed files summary (+added/-removed)
+/diff <relative-file>  # show file patch
+/push      # push current branch commits to remote using configured SSH key
 /exit      # stop session
 /status    # show session state
 ```
@@ -230,6 +234,9 @@ export RELAY_DEV_IMAGE_TEMPLATES_ENABLED="false"
 export RELAY_DEV_IMAGE_BUILD_TIMEOUT_SEC="600"
 export RELAY_GIT_AUTHOR_NAME=""
 export RELAY_GIT_AUTHOR_EMAIL=""
+export RELAY_GIT_PUSH_SSH_KEY_PATH=""
+export RELAY_GIT_PUSH_SSH_PRIVATE_KEY=""
+export RELAY_GIT_PUSH_REMOTE="origin"
 export RELAY_CONTAINER_PASSTHROUGH_ENV="OPENAI_API_KEY,OPENAI_BASE_URL,OPENAI_ORG_ID,OPENAI_PROJECT,GH_TOKEN,GITHUB_TOKEN"
 export RELAY_ALLOWED_USERS="@yourUser:localhost"
 
@@ -249,6 +256,12 @@ When `RELAY_DEV_IMAGE_TEMPLATES_ENABLED=true`, RelayShell builds a derived image
 1. `RELAY_GIT_AUTHOR_NAME` / `RELAY_GIT_AUTHOR_EMAIL` (if set)
 2. host global git config (`user.name`, `user.email`)
 3. fallback defaults (`RelayShell`, `relayshell@local`)
+
+`/push` SSH key precedence:
+1. `RELAY_GIT_PUSH_SSH_KEY_PATH` (path to private key file)
+2. `RELAY_GIT_PUSH_SSH_PRIVATE_KEY` (inline private key content; supports escaped `\n` newlines)
+
+If both are set, `RELAY_GIT_PUSH_SSH_KEY_PATH` is used.
 
 ### Config Example
 

@@ -9,6 +9,8 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"sort"
+	"strconv"
 	"strings"
 	"sync"
 )
@@ -26,6 +28,19 @@ type CommitResult struct {
 	SHA     string
 	Message string
 	Files   []string
+}
+
+type DiffFileSummary struct {
+	Path    string
+	Added   int
+	Removed int
+}
+
+type PushOptions struct {
+	Remote        string
+	Branch        string
+	SSHKeyPath    string
+	SSHPrivateKey string
 }
 
 type Manager struct {
@@ -181,6 +196,249 @@ func (m *Manager) CommitAll(ctx context.Context, workspaceDir string) (CommitRes
 	}, nil
 }
 
+func (m *Manager) WorkspaceTree(workspaceDir string, maxDepth, maxEntries int) (string, error) {
+	root := strings.TrimSpace(workspaceDir)
+	if root == "" {
+		return "", fmt.Errorf("workspace directory is required")
+	}
+
+	if maxDepth <= 0 {
+		maxDepth = 5
+	}
+	if maxEntries <= 0 {
+		maxEntries = 400
+	}
+
+	if stat, err := os.Stat(root); err != nil {
+		return "", fmt.Errorf("stat workspace: %w", err)
+	} else if !stat.IsDir() {
+		return "", fmt.Errorf("workspace path is not a directory")
+	}
+
+	var output strings.Builder
+	output.WriteString(".\n")
+
+	entriesCount := 0
+	truncated := false
+
+	var walk func(dir, prefix string, depth int) error
+	walk = func(dir, prefix string, depth int) error {
+		if depth >= maxDepth || truncated {
+			return nil
+		}
+
+		entries, err := os.ReadDir(dir)
+		if err != nil {
+			return err
+		}
+
+		filtered := make([]os.DirEntry, 0, len(entries))
+		for _, entry := range entries {
+			if entry.Name() == ".git" {
+				continue
+			}
+			filtered = append(filtered, entry)
+		}
+
+		for idx, entry := range filtered {
+			if entriesCount >= maxEntries {
+				truncated = true
+				return nil
+			}
+
+			entriesCount++
+			isLast := idx == len(filtered)-1
+			connector := "|-- "
+			nextPrefix := prefix + "|   "
+			if isLast {
+				connector = "`-- "
+				nextPrefix = prefix + "    "
+			}
+
+			name := entry.Name()
+			if entry.IsDir() {
+				name += "/"
+			}
+			output.WriteString(prefix + connector + name + "\n")
+
+			if entry.IsDir() {
+				if err := walk(filepath.Join(dir, entry.Name()), nextPrefix, depth+1); err != nil {
+					return err
+				}
+			}
+		}
+
+		return nil
+	}
+
+	if err := walk(root, "", 0); err != nil {
+		return "", fmt.Errorf("build workspace tree: %w", err)
+	}
+
+	if truncated {
+		output.WriteString(fmt.Sprintf("... truncated after %d entries\n", maxEntries))
+	}
+
+	return output.String(), nil
+}
+
+func (m *Manager) DiffSummary(ctx context.Context, workspaceDir string) ([]DiffFileSummary, error) {
+	out, err := runGitOutput(ctx, "-C", workspaceDir, "diff", "--numstat", "HEAD")
+	if err != nil {
+		return nil, err
+	}
+
+	byPath := map[string]DiffFileSummary{}
+	for _, line := range splitNonEmptyLines(out) {
+		parts := strings.SplitN(line, "\t", 3)
+		if len(parts) != 3 {
+			continue
+		}
+
+		added, _ := strconv.Atoi(parts[0])
+		removed, _ := strconv.Atoi(parts[1])
+		path := strings.TrimSpace(parts[2])
+		if path == "" {
+			continue
+		}
+
+		byPath[path] = DiffFileSummary{Path: path, Added: added, Removed: removed}
+	}
+
+	untracked, err := runGitOutput(ctx, "-C", workspaceDir, "ls-files", "--others", "--exclude-standard")
+	if err != nil {
+		return nil, err
+	}
+	for _, path := range splitNonEmptyLines(untracked) {
+		if _, exists := byPath[path]; exists {
+			continue
+		}
+		byPath[path] = DiffFileSummary{Path: path, Added: 0, Removed: 0}
+	}
+
+	summaries := make([]DiffFileSummary, 0, len(byPath))
+	for _, item := range byPath {
+		summaries = append(summaries, item)
+	}
+	sort.Slice(summaries, func(i, j int) bool { return summaries[i].Path < summaries[j].Path })
+
+	return summaries, nil
+}
+
+func (m *Manager) DiffFile(ctx context.Context, workspaceDir, relativePath string) (string, error) {
+	trimmed := strings.TrimSpace(relativePath)
+	if trimmed == "" {
+		return "", fmt.Errorf("file path is required")
+	}
+	if filepath.IsAbs(trimmed) {
+		return "", fmt.Errorf("file path must be relative")
+	}
+	if strings.HasPrefix(filepath.Clean(trimmed), "..") {
+		return "", fmt.Errorf("file path must stay inside workspace")
+	}
+
+	out, err := runGitOutput(ctx, "-C", workspaceDir, "diff", "HEAD", "--", trimmed)
+	if err != nil {
+		return "", err
+	}
+	if strings.TrimSpace(out) != "" {
+		return out, nil
+	}
+
+	untracked, err := runGitOutput(ctx, "-C", workspaceDir, "ls-files", "--others", "--exclude-standard", "--", trimmed)
+	if err != nil {
+		return "", err
+	}
+	if strings.TrimSpace(untracked) == "" {
+		return out, nil
+	}
+
+	noIndexOut, err := runGitOutputAllowExitCode(ctx, []int{0, 1}, "-C", workspaceDir, "diff", "--no-index", "--", "/dev/null", trimmed)
+	if err != nil {
+		return "", err
+	}
+
+	return noIndexOut, nil
+}
+
+func (m *Manager) Push(ctx context.Context, workspaceDir string, options PushOptions) (string, error) {
+	sshKeyPath := strings.TrimSpace(options.SSHKeyPath)
+	privateKey := normalizePrivateKey(options.SSHPrivateKey)
+
+	if sshKeyPath == "" && privateKey == "" {
+		return "", fmt.Errorf("push requires SSH key configuration")
+	}
+
+	if sshKeyPath == "" {
+		keyDir := filepath.Join(workspaceDir, ".relayshell")
+		if err := os.MkdirAll(keyDir, 0o700); err != nil {
+			return "", fmt.Errorf("create key directory: %w", err)
+		}
+
+		tmpFile, err := os.CreateTemp(keyDir, "push-key-*")
+		if err != nil {
+			return "", fmt.Errorf("create temp ssh key file: %w", err)
+		}
+		tmpPath := tmpFile.Name()
+		if _, err := tmpFile.WriteString(privateKey); err != nil {
+			_ = tmpFile.Close()
+			_ = os.Remove(tmpPath)
+			return "", fmt.Errorf("write temp ssh key file: %w", err)
+		}
+		if err := tmpFile.Close(); err != nil {
+			_ = os.Remove(tmpPath)
+			return "", fmt.Errorf("close temp ssh key file: %w", err)
+		}
+		if err := os.Chmod(tmpPath, 0o600); err != nil {
+			_ = os.Remove(tmpPath)
+			return "", fmt.Errorf("chmod temp ssh key file: %w", err)
+		}
+
+		defer os.Remove(tmpPath)
+		sshKeyPath = tmpPath
+	}
+
+	remote := strings.TrimSpace(options.Remote)
+	if remote == "" {
+		remote = "origin"
+	}
+
+	branch := strings.TrimSpace(options.Branch)
+	if branch == "" {
+		branchOut, err := runGitOutput(ctx, "-C", workspaceDir, "rev-parse", "--abbrev-ref", "HEAD")
+		if err != nil {
+			return "", err
+		}
+		branch = strings.TrimSpace(branchOut)
+	}
+
+	sshCommand := fmt.Sprintf("ssh -i %s -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new", shellEscape(sshKeyPath))
+	cmd := exec.CommandContext(ctx, "git", "-C", workspaceDir, "push", remote, branch)
+	cmd.Env = append(os.Environ(), "GIT_SSH_COMMAND="+sshCommand)
+
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return "", fmt.Errorf("git push failed: %w: %s", err, strings.TrimSpace(string(output)))
+	}
+
+	return string(output), nil
+}
+
+func normalizePrivateKey(value string) string {
+	trimmed := strings.TrimSpace(value)
+	if trimmed == "" {
+		return ""
+	}
+	return strings.ReplaceAll(trimmed, `\n`, "\n") + "\n"
+}
+
+func shellEscape(value string) string {
+	if value == "" {
+		return "''"
+	}
+	return "'" + strings.ReplaceAll(value, "'", "'\\''") + "'"
+}
+
 func buildCommitMessage(files []string) string {
 	if len(files) == 1 {
 		return "Update " + files[0]
@@ -247,12 +505,33 @@ func runGit(ctx context.Context, args ...string) error {
 }
 
 func runGitOutput(ctx context.Context, args ...string) (string, error) {
+	out, err := runGitOutputAllowExitCode(ctx, []int{0}, args...)
+	if err != nil {
+		return "", err
+	}
+	return out, nil
+}
+
+func runGitOutputAllowExitCode(ctx context.Context, allowedExitCodes []int, args ...string) (string, error) {
 	cmd := exec.CommandContext(ctx, "git", args...)
 	output, err := cmd.CombinedOutput()
-	if err != nil {
-		return "", fmt.Errorf("git %s failed: %w: %s", strings.Join(args, " "), err, strings.TrimSpace(string(output)))
+	if err == nil {
+		return string(output), nil
 	}
-	return string(output), nil
+
+	exitCode := -1
+	var exitErr *exec.ExitError
+	if errors.As(err, &exitErr) {
+		exitCode = exitErr.ExitCode()
+	}
+
+	for _, allowed := range allowedExitCodes {
+		if allowed == exitCode {
+			return string(output), nil
+		}
+	}
+
+	return "", fmt.Errorf("git %s failed: %w: %s", strings.Join(args, " "), err, strings.TrimSpace(string(output)))
 }
 
 func (m *Manager) ensureMirror(ctx context.Context, repo string) error {

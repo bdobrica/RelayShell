@@ -17,6 +17,9 @@ const (
 	CommandCommit  CommandName = "commit"
 	CommandStatus  CommandName = "status"
 	CommandEnter   CommandName = "enter"
+	CommandTree    CommandName = "tree"
+	CommandPush    CommandName = "push"
+	CommandDiff    CommandName = "diff"
 )
 
 type Command struct {
@@ -24,6 +27,7 @@ type Command struct {
 	Repo   string
 	Branch string
 	Agent  string
+	Path   string
 }
 
 // ParseCommand parses supported slash commands with strict argument validation.
@@ -40,11 +44,21 @@ func ParseCommand(input string) (Command, error) {
 	name := strings.TrimPrefix(parts[0], "/")
 
 	switch CommandName(name) {
-	case CommandRestart, CommandExit, CommandCommit, CommandStatus, CommandEnter:
+	case CommandRestart, CommandExit, CommandCommit, CommandStatus, CommandEnter, CommandTree, CommandPush:
 		if len(parts) != 1 {
 			return Command{}, fmt.Errorf("/%s does not accept arguments", name)
 		}
 		return Command{Name: CommandName(name)}, nil
+	case CommandDiff:
+		if len(parts) == 1 {
+			return Command{Name: CommandDiff}, nil
+		}
+
+		path := strings.TrimSpace(strings.TrimPrefix(trimmed, "/diff"))
+		if path == "" {
+			return Command{}, fmt.Errorf("/diff optional file argument must not be empty")
+		}
+		return Command{Name: CommandDiff, Path: path}, nil
 	case CommandStart:
 		if len(parts) != 4 {
 			return Command{}, fmt.Errorf("/start requires exactly repo=<repo> branch=<branch> agent=<agent>")

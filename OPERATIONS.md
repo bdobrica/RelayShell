@@ -171,7 +171,7 @@ Then use that HTTPS URL in Element Web advanced login.
 3. Send normal prompts; they are forwarded to Codex inside that session container.
 4. Slash commands unknown to RelayShell (for example `/model`) are passed through to the agent in session rooms.
 5. Each forwarded message is submitted with Enter automatically. Use `/enter` to send Enter by itself (for prompts like "Press enter to continue").
-6. Session commands currently available in session rooms: `/status`, `/restart`, `/commit`, `/exit`, `/enter`.
+6. Session commands currently available in session rooms: `/status`, `/restart`, `/commit`, `/tree`, `/diff`, `/diff <relative-file>`, `/push`, `/exit`, `/enter`.
 7. `/commit` stages all workspace changes (`git add -A`), creates a commit with an automatic fallback message, and returns commit SHA.
 8. `/exit` applies session room archival policy via `RELAY_SESSION_ROOM_ARCHIVE_POLICY`:
   1. `keep` keeps the bot joined in the session room.
@@ -181,6 +181,10 @@ Then use that HTTPS URL in Element Web advanced login.
   1. `RELAY_GIT_AUTHOR_NAME` / `RELAY_GIT_AUTHOR_EMAIL` (if set)
   2. host global git config (`git config --global user.name`, `git config --global user.email`)
   3. fallback defaults (`RelayShell`, `relayshell@local`)
+10. `/push` uses SSH key configuration:
+  1. `RELAY_GIT_PUSH_SSH_KEY_PATH` (preferred)
+  2. `RELAY_GIT_PUSH_SSH_PRIVATE_KEY` (inline private key with optional `\n` escapes)
+  3. remote defaults to `origin` (override with `RELAY_GIT_PUSH_REMOTE`)
 
 ## 8. Troubleshooting
 

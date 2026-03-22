@@ -73,6 +73,80 @@ func TestCleanupWorkspaceRemovesWorktreeAndMetadata(t *testing.T) {
 	}
 }
 
+func TestWorkspaceTreeAndDiff(t *testing.T) {
+	ctx := context.Background()
+	sourceRepo := createSourceRepo(t)
+	baseDir := t.TempDir()
+
+	mgr := NewManager(baseDir, "", "")
+	workspace, err := mgr.Prepare(ctx, "sess-diff", sourceRepo, "main")
+	if err != nil {
+		t.Fatalf("Prepare failed: %v", err)
+	}
+
+	if err := os.WriteFile(filepath.Join(workspace, "README.md"), []byte("hello\nupdated\n"), 0o644); err != nil {
+		t.Fatalf("write README.md: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(workspace, "new.txt"), []byte("new\n"), 0o644); err != nil {
+		t.Fatalf("write new.txt: %v", err)
+	}
+
+	tree, err := mgr.WorkspaceTree(workspace, 4, 50)
+	if err != nil {
+		t.Fatalf("WorkspaceTree failed: %v", err)
+	}
+	if !strings.Contains(tree, "README.md") || !strings.Contains(tree, "new.txt") {
+		t.Fatalf("tree output missing expected files: %s", tree)
+	}
+
+	summary, err := mgr.DiffSummary(ctx, workspace)
+	if err != nil {
+		t.Fatalf("DiffSummary failed: %v", err)
+	}
+	if len(summary) == 0 {
+		t.Fatal("DiffSummary returned no changes")
+	}
+
+	hasReadme := false
+	for _, item := range summary {
+		if item.Path == "README.md" {
+			hasReadme = true
+			break
+		}
+	}
+	if !hasReadme {
+		t.Fatalf("DiffSummary missing README.md entry: %+v", summary)
+	}
+
+	diff, err := mgr.DiffFile(ctx, workspace, "README.md")
+	if err != nil {
+		t.Fatalf("DiffFile failed: %v", err)
+	}
+	if !strings.Contains(diff, "diff --git") {
+		t.Fatalf("unexpected diff output: %s", diff)
+	}
+}
+
+func TestPushRequiresSSHKey(t *testing.T) {
+	ctx := context.Background()
+	sourceRepo := createSourceRepo(t)
+	baseDir := t.TempDir()
+
+	mgr := NewManager(baseDir, "", "")
+	workspace, err := mgr.Prepare(ctx, "sess-push", sourceRepo, "main")
+	if err != nil {
+		t.Fatalf("Prepare failed: %v", err)
+	}
+
+	_, err = mgr.Push(ctx, workspace, PushOptions{})
+	if err == nil {
+		t.Fatal("Push expected error when SSH key is missing")
+	}
+	if !strings.Contains(err.Error(), "SSH key") {
+		t.Fatalf("unexpected push error: %v", err)
+	}
+}
+
 func createSourceRepo(t *testing.T) string {
 	t.Helper()
 

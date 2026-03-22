@@ -260,6 +260,12 @@ func (a *app) handleSessionEvent(ctx context.Context, session *sessions.Session,
 			_ = a.matrix.SendText(ctx, event.RoomID, fmt.Sprintf("Session %s is %s", session.ID, session.State))
 		case sessions.CommandCommit:
 			a.commitSession(ctx, session)
+		case sessions.CommandTree:
+			a.sendWorkspaceTree(ctx, session)
+		case sessions.CommandPush:
+			a.pushSession(ctx, session)
+		case sessions.CommandDiff:
+			a.diffSession(ctx, session, cmd.Path)
 		case sessions.CommandEnter:
 			bridgeRef, ok := a.getBridge(session.RoomID)
 			if !ok {
@@ -348,6 +354,99 @@ func (a *app) commitSession(ctx context.Context, session *sessions.Session) {
 	}
 
 	_ = a.matrix.SendText(ctx, session.RoomID, strings.Join(summary, "\n"))
+}
+
+func (a *app) sendWorkspaceTree(ctx context.Context, session *sessions.Session) {
+	if strings.TrimSpace(session.WorkspaceDir) == "" {
+		_ = a.matrix.SendText(ctx, session.RoomID, "No workspace available")
+		return
+	}
+
+	tree, err := a.git.WorkspaceTree(session.WorkspaceDir, 5, 350)
+	if err != nil {
+		a.logger.Error("workspace tree failed", "session_id", session.ID, "workspace", session.WorkspaceDir, "error", err)
+		_ = a.matrix.SendText(ctx, session.RoomID, "Failed to list workspace tree: "+err.Error())
+		return
+	}
+
+	_ = a.matrix.SendText(ctx, session.RoomID, trimForMatrix("Workspace tree\n"+tree, 12000))
+}
+
+func (a *app) pushSession(ctx context.Context, session *sessions.Session) {
+	if strings.TrimSpace(session.WorkspaceDir) == "" {
+		_ = a.matrix.SendText(ctx, session.RoomID, "No workspace available for push")
+		return
+	}
+
+	output, err := a.git.Push(ctx, session.WorkspaceDir, gitops.PushOptions{
+		Remote:        a.cfg.GitPushRemote,
+		SSHKeyPath:    a.cfg.GitPushSSHKeyPath,
+		SSHPrivateKey: a.cfg.GitPushSSHPrivateKey,
+	})
+	if err != nil {
+		a.logger.Error("push session failed", "session_id", session.ID, "workspace", session.WorkspaceDir, "error", err)
+		_ = a.matrix.SendText(ctx, session.RoomID, "Push failed: "+err.Error())
+		return
+	}
+
+	response := "Push completed"
+	if strings.TrimSpace(output) != "" {
+		response += "\n" + strings.TrimSpace(output)
+	}
+	_ = a.matrix.SendText(ctx, session.RoomID, trimForMatrix(response, 12000))
+}
+
+func (a *app) diffSession(ctx context.Context, session *sessions.Session, relativePath string) {
+	if strings.TrimSpace(session.WorkspaceDir) == "" {
+		_ = a.matrix.SendText(ctx, session.RoomID, "No workspace available for diff")
+		return
+	}
+
+	if strings.TrimSpace(relativePath) == "" {
+		summary, err := a.git.DiffSummary(ctx, session.WorkspaceDir)
+		if err != nil {
+			a.logger.Error("diff summary failed", "session_id", session.ID, "workspace", session.WorkspaceDir, "error", err)
+			_ = a.matrix.SendText(ctx, session.RoomID, "Diff failed: "+err.Error())
+			return
+		}
+
+		if len(summary) == 0 {
+			_ = a.matrix.SendText(ctx, session.RoomID, "No local changes")
+			return
+		}
+
+		lines := make([]string, 0, len(summary)+1)
+		lines = append(lines, "Changed files:")
+		for _, item := range summary {
+			lines = append(lines, fmt.Sprintf("%s +%d/-%d", item.Path, item.Added, item.Removed))
+		}
+		_ = a.matrix.SendText(ctx, session.RoomID, trimForMatrix(strings.Join(lines, "\n"), 12000))
+		return
+	}
+
+	diff, err := a.git.DiffFile(ctx, session.WorkspaceDir, relativePath)
+	if err != nil {
+		a.logger.Error("diff file failed", "session_id", session.ID, "workspace", session.WorkspaceDir, "path", relativePath, "error", err)
+		_ = a.matrix.SendText(ctx, session.RoomID, "Diff failed: "+err.Error())
+		return
+	}
+
+	if strings.TrimSpace(diff) == "" {
+		_ = a.matrix.SendText(ctx, session.RoomID, "No changes for file: "+relativePath)
+		return
+	}
+
+	_ = a.matrix.SendText(ctx, session.RoomID, trimForMatrix(diff, 12000))
+}
+
+func trimForMatrix(value string, maxChars int) string {
+	if maxChars <= 0 || len(value) <= maxChars {
+		return value
+	}
+	if maxChars < 64 {
+		return value[:maxChars]
+	}
+	return value[:maxChars-32] + "\n... output truncated"
 }
 
 func (a *app) startSession(ctx context.Context, ownerUserID string, cmd sessions.Command) (*sessions.Session, error) {

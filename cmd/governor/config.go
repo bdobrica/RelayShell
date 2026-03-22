@@ -30,6 +30,9 @@ type config struct {
 	ContainerEnv          map[string]string
 	GitAuthorName         string
 	GitAuthorEmail        string
+	GitPushSSHKeyPath     string
+	GitPushSSHPrivateKey  string
+	GitPushRemote         string
 	AllowedUsers          map[string]struct{}
 	BridgeBatchIdle       time.Duration
 	BridgeFlushMax        time.Duration
@@ -85,6 +88,9 @@ func loadConfig() (config, error) {
 	copilotCommand := normalizeCopilotCommand(envWithDefault("RELAY_AGENT_COPILOT_COMMAND", "copilot"))
 	gitAuthorName := strings.TrimSpace(os.Getenv("RELAY_GIT_AUTHOR_NAME"))
 	gitAuthorEmail := strings.TrimSpace(os.Getenv("RELAY_GIT_AUTHOR_EMAIL"))
+	gitPushSSHKeyPath := strings.TrimSpace(os.Getenv("RELAY_GIT_PUSH_SSH_KEY_PATH"))
+	gitPushSSHPrivateKey := strings.TrimSpace(os.Getenv("RELAY_GIT_PUSH_SSH_PRIVATE_KEY"))
+	gitPushRemote := strings.TrimSpace(os.Getenv("RELAY_GIT_PUSH_REMOTE"))
 
 	passthroughEnv := parseCSVList(envWithDefault(
 		"RELAY_CONTAINER_PASSTHROUGH_ENV",
@@ -142,6 +148,9 @@ func loadConfig() (config, error) {
 		ContainerEnv:          containerEnv,
 		GitAuthorName:         gitAuthorName,
 		GitAuthorEmail:        gitAuthorEmail,
+		GitPushSSHKeyPath:     gitPushSSHKeyPath,
+		GitPushSSHPrivateKey:  gitPushSSHPrivateKey,
+		GitPushRemote:         gitPushRemote,
 		AllowedUsers:          allowedUsers,
 		BridgeBatchIdle:       bridgeBatchIdle,
 		BridgeFlushMax:        bridgeFlushMax,

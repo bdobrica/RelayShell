@@ -134,3 +134,21 @@ func TestLoadConfig_InvalidContainerCPULimit(t *testing.T) {
 		t.Fatalf("error = %q, expected env var name in message", err.Error())
 	}
 }
+
+func TestLoadConfig_GitPushSSHConfiguration(t *testing.T) {
+	seedRequiredMatrixEnv(t)
+	t.Setenv("RELAY_GIT_PUSH_SSH_KEY_PATH", "/tmp/push_key")
+	t.Setenv("RELAY_GIT_PUSH_REMOTE", "origin")
+
+	cfg, err := loadConfig()
+	if err != nil {
+		t.Fatalf("loadConfig() error = %v", err)
+	}
+
+	if cfg.GitPushSSHKeyPath != "/tmp/push_key" {
+		t.Fatalf("GitPushSSHKeyPath = %q, want /tmp/push_key", cfg.GitPushSSHKeyPath)
+	}
+	if cfg.GitPushRemote != "origin" {
+		t.Fatalf("GitPushRemote = %q, want origin", cfg.GitPushRemote)
+	}
+}
