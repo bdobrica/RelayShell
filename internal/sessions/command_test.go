@@ -1,5 +1,4 @@
 package sessions
-package sessions
 
 import "testing"
 
